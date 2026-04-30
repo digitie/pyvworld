@@ -6,4 +6,6 @@
 - Added VWorld Search, Geocoder, 2D Data, WMS/WFS, Legend, StaticMap, WMTS, and TMS wrappers.
 - Added official 2D Data API 2.0 catalog with 158 service IDs.
 - Added offline tests for parameter normalization, HTTP error mapping, endpoint query construction, image/tile URL generation, and catalog integrity.
+- Added opt-in live smoke tests for real VWorld server verification.
+- Added local `.env` loading via `VworldClient.from_env_file()`.
 - Added README and implementation notes for future maintenance.

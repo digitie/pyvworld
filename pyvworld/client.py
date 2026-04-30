@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -55,6 +56,20 @@ def _attr_filter(value: str | list[str] | tuple[str, ...] | None) -> str | None:
     return "|".join(value)
 
 
+def _read_env_file(path: str | os.PathLike[str]) -> dict[str, str]:
+    env_path = Path(path)
+    values: dict[str, str] = {}
+    if not env_path.exists():
+        return values
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
 class VworldClient:
     """Client entrypoint for VWorld REST, OGC, static image, and tile endpoints."""
 
@@ -88,6 +103,21 @@ class VworldClient:
         """Create a client from ``VWORLD_API_KEY`` or ``VWORLD_KEY``."""
 
         return cls(**kwargs)
+
+    @classmethod
+    def from_env_file(
+        cls,
+        path: str | os.PathLike[str] = ".env",
+        **kwargs: Any,
+    ) -> VworldClient:
+        """Create a client from a local dotenv-style file."""
+
+        values = _read_env_file(path)
+        api_key = kwargs.pop("api_key", None) or values.get("VWORLD_API_KEY") or values.get(
+            "VWORLD_KEY"
+        )
+        domain = kwargs.pop("domain", None) or values.get("VWORLD_DOMAIN")
+        return cls(api_key=api_key, domain=domain, **kwargs)
 
     def _require_http(self) -> _VworldHttp:
         if self._http is None:

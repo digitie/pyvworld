@@ -67,6 +67,19 @@ def test_search_more_helpers_and_validation(client, monkeypatch):
         client.get_data_feature_type("")
 
 
+def test_from_env_file_loads_key_and_domain(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        'VWORLD_API_KEY="file-key"\nVWORLD_DOMAIN=example.com\n# ignored\n',
+        encoding="utf-8",
+    )
+
+    client = VworldClient.from_env_file(env_file)
+
+    assert client.api_key == "file-key"
+    assert client.domain == "example.com"
+
+
 @responses.activate
 def test_search_address_helper_adds_default_category(client, ok_payload):
     responses.add(responses.GET, BASE + "/req/search", json=ok_payload)

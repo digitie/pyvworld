@@ -30,3 +30,22 @@ Live tests should be opt-in only:
 - Prefer small requests such as one geocoder call or one tiny StaticMap.
 
 No live tests are currently required for the default validation path.
+
+## Current Live Verification
+
+The live smoke suite is in `tests/test_live_api.py`.
+
+Run it with a local `.env` file or exported environment variables:
+
+```bash
+python -m pytest -m live
+```
+
+Recommended local `.env`:
+
+```bash
+VWORLD_API_KEY="issued-key"
+VWORLD_DOMAIN="registered-domain"
+```
+
+The domain is important for WMS/WFS capabilities. During local verification on 2026-05-01, REST, Geocoder, image, WMTS, and TMS worked with the key alone. WMS/WFS capabilities were reliable when `domain=www.vworld.kr` was supplied. The 2D Data smoke test intentionally passes `domain=""` because this key returned `INCORRECT_KEY` for `/req/data` when `domain=www.vworld.kr` was attached.

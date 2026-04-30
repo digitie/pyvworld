@@ -56,7 +56,7 @@ warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not live'"
 markers = [
   "live: tests that call the real VWorld API and require VWORLD_API_KEY",
 ]

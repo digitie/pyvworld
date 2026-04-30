@@ -49,3 +49,9 @@ StaticMap 문서 기준:
 ## 해외위성영상 테마 타일 확장자
 
 일반 `Satellite` 타일은 `jpeg`가 기본이지만, 공식 해외위성영상 예시는 `png`입니다. 테마 타일은 `png`, `jpeg`, `jpg`를 허용합니다.
+
+## WMS/WFS domain 파라미터
+
+REST API는 키만으로도 동작하는 경우가 많지만, WMS/WFS는 인증키에 등록된 도메인을 `domain=`으로 함께 보내야 안정적입니다. 로컬 라이브 테스트에서는 `.env`에 `VWORLD_DOMAIN`을 저장하고 테스트 fixture가 WMS/WFS에 사용합니다.
+
+단, 같은 키라도 `/req/data`에 domain을 붙이면 `INCORRECT_KEY`가 날 수 있습니다. 이 경우 `client.get_data_feature(..., domain="")`처럼 명시적으로 빈 domain을 전달해 클라이언트 기본 domain 주입을 끕니다.

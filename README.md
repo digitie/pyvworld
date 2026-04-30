@@ -61,6 +61,17 @@ reverse = client.reverse_geocode((127.101313354, 37.402352535), type="both")
 print(reverse["response"]["result"])
 ```
 
+로컬 `.env` 파일에서 바로 읽을 수도 있습니다. `.env`는 `.gitignore`에 포함되어 커밋되지 않습니다.
+
+```bash
+VWORLD_API_KEY="발급받은_인증키"
+VWORLD_DOMAIN="인증키에 등록한_도메인"
+```
+
+```python
+client = VworldClient.from_env_file()
+```
+
 2D 데이터 API:
 
 ```python
