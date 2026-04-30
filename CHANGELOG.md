@@ -1,0 +1,9 @@
+# Changelog
+
+## 0.1.0
+
+- Initial pyvworld package.
+- Added VWorld Search, Geocoder, 2D Data, WMS/WFS, Legend, StaticMap, WMTS, and TMS wrappers.
+- Added official 2D Data API 2.0 catalog with 158 service IDs.
+- Added offline tests for parameter normalization, HTTP error mapping, endpoint query construction, image/tile URL generation, and catalog integrity.
+- Added README and implementation notes for future maintenance.
