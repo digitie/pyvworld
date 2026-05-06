@@ -31,6 +31,11 @@ def _query(call) -> dict[str, list[str]]:
 def test_response_models_are_public_imports():
     assert BinaryResponse(b"ok").content == b"ok"
     assert TextResponse("<ok/>").text == "<ok/>"
+    assert BinaryResponse(content=b"ok").model_dump() == {
+        "content": b"ok",
+        "content_type": None,
+    }
+    assert TextResponse(text="<ok/>").model_dump_json() == '{"text":"<ok/>","content_type":null}'
 
 
 @responses.activate

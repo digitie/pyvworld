@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from pyvworld import (
     BBox,
@@ -35,11 +36,29 @@ def test_bbox_model_and_factory():
     assert bbox(box) == "126.9,37.4,127.1,37.6"
 
 
+def test_coordinate_models_are_pydantic_models():
+    point_model = LatLon.model_validate({"lat": "37.5", "lon": "127.0"})
+    box = BBox.model_validate({"minx": "126.9", "miny": 37.4, "maxx": 127.1, "maxy": 37.6})
+
+    assert point_model.model_dump() == {"lat": 37.5, "lon": 127.0}
+    assert point_model.model_dump_json() == '{"lat":37.5,"lon":127.0}'
+    assert box.as_tuple() == (126.9, 37.4, 127.1, 37.6)
+    assert "properties" in LatLon.model_json_schema()
+
+
+def test_coordinate_models_are_frozen():
+    point_model = LatLon(lat=37.5, lon=127.0)
+
+    with pytest.raises(ValidationError):
+        point_model.lat = 38.0
+
+
 @pytest.mark.parametrize(
     "factory",
     [
         lambda: latlon(91, 127),
         lambda: lonlat(181, 37),
+        lambda: latlon("not-a-number", 127),
         lambda: BBox(minx=2, miny=0, maxx=1, maxy=3),
         lambda: BBox(minx=1, miny=4, maxx=2, maxy=3),
     ],

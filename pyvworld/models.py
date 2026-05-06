@@ -2,33 +2,46 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
-from typing import TypeAlias
+from typing import Any, TypeAlias
+
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator, model_validator
 
 from .exceptions import VworldInvalidParameterError
 
 
-def _require_finite_number(value: float, name: str) -> float:
-    number = float(value)
+def _require_finite_number(value: Any, name: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise VworldInvalidParameterError(f"{name} must be a finite number") from exc
     if not isfinite(number):
         raise VworldInvalidParameterError(f"{name} must be finite")
     return number
 
 
-def _require_lat(value: float) -> float:
+def _require_lat(value: Any) -> float:
     number = _require_finite_number(value, "lat")
     if not -90 <= number <= 90:
         raise VworldInvalidParameterError("lat must be between -90 and 90")
     return number
 
 
-def _require_lon(value: float) -> float:
+def _require_lon(value: Any) -> float:
     number = _require_finite_number(value, "lon")
     if not -180 <= number <= 180:
         raise VworldInvalidParameterError("lon must be between -180 and 180")
     return number
+
+
+class _FrozenModel(BaseModel):
+    """Shared immutable Pydantic model settings for public value objects."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
 
 class Crs(str, Enum):
@@ -129,8 +142,7 @@ class TileLayer(str, Enum):
     SATELLITE = "Satellite"
 
 
-@dataclass(frozen=True, slots=True)
-class LonLat:
+class LonLat(_FrozenModel):
     """WGS84 longitude/latitude point.
 
     VWorld point parameters are ``x,y``. For EPSG:4326 that means
@@ -140,9 +152,18 @@ class LonLat:
     lon: float
     lat: float
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "lon", _require_lon(self.lon))
-        object.__setattr__(self, "lat", _require_lat(self.lat))
+    def __init__(self, lon: float, lat: float) -> None:
+        super().__init__(lon=lon, lat=lat)
+
+    @field_validator("lon", mode="before")
+    @classmethod
+    def _validate_lon(cls, value: Any) -> float:
+        return _require_lon(value)
+
+    @field_validator("lat", mode="before")
+    @classmethod
+    def _validate_lat(cls, value: Any) -> float:
+        return _require_lat(value)
 
     def as_xy(self) -> tuple[float, float]:
         """Return the VWorld point order: ``(x, y) == (lon, lat)``."""
@@ -150,16 +171,24 @@ class LonLat:
         return (self.lon, self.lat)
 
 
-@dataclass(frozen=True, slots=True)
-class LatLon:
-    """WGS84 latitude/longitude point for common Korean "위경도" usage."""
+class LatLon(_FrozenModel):
+    """WGS84 latitude/longitude point for common ``lat, lon`` usage."""
 
     lat: float
     lon: float
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "lat", _require_lat(self.lat))
-        object.__setattr__(self, "lon", _require_lon(self.lon))
+    def __init__(self, lat: float, lon: float) -> None:
+        super().__init__(lat=lat, lon=lon)
+
+    @field_validator("lat", mode="before")
+    @classmethod
+    def _validate_lat(cls, value: Any) -> float:
+        return _require_lat(value)
+
+    @field_validator("lon", mode="before")
+    @classmethod
+    def _validate_lon(cls, value: Any) -> float:
+        return _require_lon(value)
 
     def as_xy(self) -> tuple[float, float]:
         """Return the VWorld point order: ``(x, y) == (lon, lat)``."""
@@ -172,8 +201,7 @@ class LatLon:
         return LonLat(lon=self.lon, lat=self.lat)
 
 
-@dataclass(frozen=True, slots=True)
-class BBox:
+class BBox(_FrozenModel):
     """Bounding box in VWorld order: ``minx,miny,maxx,maxy``."""
 
     minx: float
@@ -181,19 +209,21 @@ class BBox:
     maxx: float
     maxy: float
 
-    def __post_init__(self) -> None:
-        minx = _require_finite_number(self.minx, "minx")
-        miny = _require_finite_number(self.miny, "miny")
-        maxx = _require_finite_number(self.maxx, "maxx")
-        maxy = _require_finite_number(self.maxy, "maxy")
-        if minx > maxx:
+    def __init__(self, minx: float, miny: float, maxx: float, maxy: float) -> None:
+        super().__init__(minx=minx, miny=miny, maxx=maxx, maxy=maxy)
+
+    @field_validator("minx", "miny", "maxx", "maxy", mode="before")
+    @classmethod
+    def _validate_finite(cls, value: Any, info: ValidationInfo) -> float:
+        return _require_finite_number(value, str(info.field_name))
+
+    @model_validator(mode="after")
+    def _validate_order(self) -> BBox:
+        if self.minx > self.maxx:
             raise VworldInvalidParameterError("minx must be less than or equal to maxx")
-        if miny > maxy:
+        if self.miny > self.maxy:
             raise VworldInvalidParameterError("miny must be less than or equal to maxy")
-        object.__setattr__(self, "minx", minx)
-        object.__setattr__(self, "miny", miny)
-        object.__setattr__(self, "maxx", maxx)
-        object.__setattr__(self, "maxy", maxy)
+        return self
 
     @classmethod
     def from_latlon(
@@ -241,17 +271,21 @@ def bbox_from_latlon(*, south: float, west: float, north: float, east: float) ->
     return BBox.from_latlon(south=south, west=west, north=north, east=east)
 
 
-@dataclass(frozen=True, slots=True)
-class BinaryResponse:
+class BinaryResponse(_FrozenModel):
     """Binary response returned by image and tile helpers."""
 
     content: bytes
     content_type: str | None = None
 
+    def __init__(self, content: bytes, content_type: str | None = None) -> None:
+        super().__init__(content=content, content_type=content_type)
 
-@dataclass(frozen=True, slots=True)
-class TextResponse:
+
+class TextResponse(_FrozenModel):
     """Text response returned by OGC XML helpers."""
 
     text: str
     content_type: str | None = None
+
+    def __init__(self, text: str, content_type: str | None = None) -> None:
+        super().__init__(text=text, content_type=content_type)

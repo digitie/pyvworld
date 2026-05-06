@@ -18,7 +18,7 @@
 
 ## Public Types
 
-Public wrappers accept the original string values and typed helpers. Enums cover common documented parameter sets such as search/address categories, CRS, legend type, image format, StaticMap basemap, and tile layers. `LatLon`, `LonLat`, and `BBox` standardize coordinate order for external programs without changing existing tuple inputs.
+Public wrappers accept the original string values and typed helpers. Enums cover common documented parameter sets such as search/address categories, CRS, legend type, image format, StaticMap basemap, and tile layers. `LatLon`, `LonLat`, `BBox`, `BinaryResponse`, and `TextResponse` are frozen Pydantic v2 models, so external programs can use `model_validate()`, `model_dump()`, and JSON schema generation without changing existing tuple inputs.
 
 ## Not Implemented
 

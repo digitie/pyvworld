@@ -74,7 +74,7 @@ client = VworldClient.from_env_file()
 
 ## 타입/좌표 모델
 
-외부 프로그램에서 문자열 상수를 직접 외우지 않아도 되도록 주요 파라미터 enum을 제공합니다. 기존 문자열 호출은 그대로 동작합니다.
+외부 프로그램에서 문자열 상수를 직접 외우지 않아도 되도록 주요 파라미터 enum을 제공합니다. 기존 문자열 호출은 그대로 동작합니다. 공개 값 객체는 Pydantic v2 `BaseModel` 기반이라 `model_validate()`, `model_dump()`, `model_json_schema()`로도 다룰 수 있습니다.
 
 ```python
 from pyvworld import (
@@ -109,6 +109,8 @@ client.static_map_url(
     basemap=StaticMapBase.PHOTO_HYBRID,
     format=ImageFormat.PNG,
 )
+
+payload = latlon(37.402352535, 127.101313354).model_dump()
 ```
 
 VWorld의 `point` 파라미터는 `x,y` 순서입니다. `EPSG:4326`에서는 `x=lon`, `y=lat`이므로 일반적인 “위경도” 입력은 `latlon(lat, lon)` 또는 `LatLon(lat=..., lon=...)`을 쓰는 것을 권장합니다. 기존 `(lon, lat)` 튜플도 계속 지원합니다.
