@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import os
+import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 
 from pyvworld import VworldClient
+from pyvworld.exceptions import VworldAuthError, VworldNetworkError, VworldServerError
 
 pytestmark = pytest.mark.live
+T = TypeVar("T")
 
 
 def _local_env() -> dict[str, str]:
@@ -43,57 +47,77 @@ def _status(payload: dict[str, Any]) -> str:
     return status
 
 
+def _live_call(call: Callable[[], T]) -> T:
+    last_error: Exception | None = None
+    for attempt in range(5):
+        try:
+            return call()
+        except (VworldAuthError, VworldNetworkError, VworldServerError) as exc:
+            last_error = exc
+            if attempt < 4:
+                time.sleep(0.5)
+    assert last_error is not None
+    raise last_error
+
+
 def test_live_search_geocoder_and_data(live_client: VworldClient):
-    search = live_client.search_address("성남시 분당구 판교로 242", size=1)
+    search = _live_call(lambda: live_client.search_address("성남시 분당구 판교로 242", size=1))
     assert _status(search) == "OK"
 
-    geocoded = live_client.geocode("판교로 242", type="road")
+    geocoded = _live_call(lambda: live_client.geocode("판교로 242", type="road"))
     assert _status(geocoded) == "OK"
     point = geocoded["response"]["result"]["point"]
     x, y = float(point["x"]), float(point["y"])
 
-    reverse = live_client.reverse_geocode((x, y), type="both")
+    reverse = _live_call(lambda: live_client.reverse_geocode((x, y), type="both"))
     assert _status(reverse) == "OK"
 
-    feature = live_client.get_data_feature(
-        "LT_C_ADEMD_INFO",
-        attr_filter="emd_cd:=:11650108",
-        geometry=False,
-        size=1,
+    data_client = VworldClient(
+        live_client.api_key,
         domain="",
+        timeout=20,
+        max_retries=1,
+        retry_backoff=0,
+    )
+    feature = _live_call(
+        lambda: data_client.get_data_feature(
+            "LT_C_ADEMD_INFO",
+            attr_filter="emd_cd:=:11650108",
+            geometry=False,
+            size=1,
+        )
     )
     assert _status(feature) == "OK"
 
 
 def test_live_ogc_capabilities(live_client: VworldClient):
-    if not live_client.domain:
-        pytest.skip("VWORLD_DOMAIN is required for reliable live WMS/WFS capabilities tests")
-
-    wms = live_client.wms_get_capabilities()
+    wms = _live_call(lambda: live_client.wms_get_capabilities(domain=""))
     assert "WMS_Capabilities" in wms.text
 
-    wfs = live_client.wfs_get_capabilities()
+    wfs = _live_call(lambda: live_client.wfs_get_capabilities(domain=""))
     assert "WFS_Capabilities" in wfs.text
 
 
 def test_live_images_and_tiles(live_client: VworldClient):
-    legend = live_client.get_legend_graphic("lt_c_uq111", style="lt_c_uq111")
+    legend = _live_call(lambda: live_client.get_legend_graphic("lt_c_uq111", style="lt_c_uq111"))
     assert legend.content_type is not None
     assert "image" in legend.content_type.lower()
     assert len(legend.content) > 100
 
-    static = live_client.static_map(center=(126.978271, 37.566643), zoom=16, size=(128, 128))
+    static = _live_call(
+        lambda: live_client.static_map(center=(126.978271, 37.566643), zoom=16, size=(128, 128))
+    )
     assert static.content_type is not None
     assert "image" in static.content_type.lower()
     assert len(static.content) > 100
 
-    wmts_capabilities = live_client.get_wmts_capabilities()
+    wmts_capabilities = _live_call(lambda: live_client.get_wmts_capabilities())
     assert "Capabilities" in wmts_capabilities.text
 
-    tile = live_client.get_wmts_tile("Base", 11, 793, 1746)
+    tile = _live_call(lambda: live_client.get_wmts_tile("Base", 11, 793, 1746))
     assert tile.content_type is not None
     assert "image" in tile.content_type.lower()
     assert len(tile.content) > 100
 
-    tms_resource = live_client.get_tms_resource()
+    tms_resource = _live_call(lambda: live_client.get_tms_resource())
     assert "TileMapService" in tms_resource.text

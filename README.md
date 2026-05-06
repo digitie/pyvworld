@@ -42,7 +42,7 @@ PowerShell:
 $env:VWORLD_API_KEY="발급받은_인증키"
 ```
 
-도메인 파라미터가 필요한 환경에서는 `VWORLD_DOMAIN` 또는 클라이언트 생성자의 `domain=`을 사용합니다.
+도메인 파라미터가 필요한 환경에서는 `VWORLD_DOMAIN`, `VworldClient.from_env_file()`, 또는 클라이언트 생성자의 `domain=`을 사용합니다. 엔드포인트별로 VWorld의 도메인 검증 동작이 다를 수 있어, 특정 호출에서만 바꾸려면 메서드의 `domain=` 인자를 사용합니다.
 
 ## 사용 예시
 
@@ -71,6 +71,49 @@ VWORLD_DOMAIN="인증키에 등록한_도메인"
 ```python
 client = VworldClient.from_env_file()
 ```
+
+## 타입/좌표 모델
+
+외부 프로그램에서 문자열 상수를 직접 외우지 않아도 되도록 주요 파라미터 enum을 제공합니다. 기존 문자열 호출은 그대로 동작합니다.
+
+```python
+from pyvworld import (
+    AddressCategory,
+    AddressType,
+    Crs,
+    ImageFormat,
+    SearchType,
+    StaticMapBase,
+    VworldClient,
+    bbox_from_latlon,
+    latlon,
+)
+
+client = VworldClient.from_env_file()
+
+client.search(
+    "판교",
+    SearchType.ADDRESS,
+    category=AddressCategory.ROAD,
+    bbox=bbox_from_latlon(south=37.3, west=126.9, north=37.6, east=127.2),
+    crs=Crs.WGS84,
+)
+
+client.geocode("판교로 242", type=AddressType.ROAD)
+client.reverse_geocode(latlon(37.402352535, 127.101313354))
+
+client.static_map_url(
+    center=latlon(37.566643, 126.978271),
+    zoom=16,
+    size=(400, 400),
+    basemap=StaticMapBase.PHOTO_HYBRID,
+    format=ImageFormat.PNG,
+)
+```
+
+VWorld의 `point` 파라미터는 `x,y` 순서입니다. `EPSG:4326`에서는 `x=lon`, `y=lat`이므로 일반적인 “위경도” 입력은 `latlon(lat, lon)` 또는 `LatLon(lat=..., lon=...)`을 쓰는 것을 권장합니다. 기존 `(lon, lat)` 튜플도 계속 지원합니다.
+
+`StaticMapBase`와 `ImageFormat`은 공식 문서의 값(`NONE`, `GRAPHIC_WHITE`, `GRAPHIC_NIGHT`, `PHOTO_HYBRID`, `bmp` 등)을 포함합니다. 기존에 쓰기 쉬운 이름으로 넣었던 `StaticMapBase.HYBRID`는 `PHOTO_HYBRID` 별칭으로 유지합니다.
 
 2D 데이터 API:
 

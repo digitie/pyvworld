@@ -16,6 +16,10 @@
 | WMTS | `/req/wmts/1.0.0/{key}/...` | official WMTS path only | `wmts_*` |
 | TMS | `/req/tms/1.0.0/{key}/...` | official TMS path only | `tms_*` |
 
+## Public Types
+
+Public wrappers accept the original string values and typed helpers. Enums cover common documented parameter sets such as search/address categories, CRS, legend type, image format, StaticMap basemap, and tile layers. `LatLon`, `LonLat`, and `BBox` standardize coordinate order for external programs without changing existing tuple inputs.
+
 ## Not Implemented
 
 These are not Python HTTP endpoint wrappers:

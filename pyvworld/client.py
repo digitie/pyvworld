@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -22,7 +23,23 @@ from ._params import (
     validate_zoom,
 )
 from .exceptions import VworldAuthError, VworldInvalidParameterError
-from .models import BinaryResponse, TextResponse, TileLayer
+from .models import (
+    AddressCategory,
+    AddressType,
+    BBoxLike,
+    BinaryResponse,
+    Crs,
+    DistrictCategory,
+    ImageFormat,
+    LatLon,
+    LegendType,
+    PointLike,
+    ReverseGeocodeType,
+    SearchType,
+    StaticMapBase,
+    TextResponse,
+    TileLayer,
+)
 
 JsonObject = dict[str, Any]
 
@@ -30,8 +47,8 @@ JsonObject = dict[str, Any]
 _REST_VERSION = "2.0"
 _DEFAULT_FORMAT = "json"
 _DEFAULT_ERROR_FORMAT = "json"
-_DEFAULT_CRS = "EPSG:4326"
-_DEFAULT_OGC_CRS = "EPSG:900913"
+_DEFAULT_CRS = Crs.WGS84
+_DEFAULT_OGC_CRS = Crs.GOOGLE_MERCATOR
 
 _TILE_ZOOM_RANGES: dict[str, tuple[int, int]] = {
     TileLayer.BASE.value: (6, 19),
@@ -54,6 +71,10 @@ def _attr_filter(value: str | list[str] | tuple[str, ...] | None) -> str | None:
     if value is None or isinstance(value, str):
         return value
     return "|".join(value)
+
+
+def _text_value(value: str | Enum) -> str:
+    return str(value.value) if isinstance(value, Enum) else str(value)
 
 
 def _read_env_file(path: str | os.PathLike[str]) -> dict[str, str]:
@@ -84,7 +105,7 @@ class VworldClient:
         session: Any | None = None,
     ) -> None:
         self.api_key = api_key or os.getenv("VWORLD_API_KEY") or os.getenv("VWORLD_KEY")
-        self.domain = domain or os.getenv("VWORLD_DOMAIN")
+        self.domain = domain if domain is not None else os.getenv("VWORLD_DOMAIN")
         self.timeout = timeout
         self._http = (
             _VworldHttp(
@@ -113,10 +134,12 @@ class VworldClient:
         """Create a client from a local dotenv-style file."""
 
         values = _read_env_file(path)
-        api_key = kwargs.pop("api_key", None) or values.get("VWORLD_API_KEY") or values.get(
-            "VWORLD_KEY"
+        api_key = (
+            kwargs.pop("api_key")
+            if "api_key" in kwargs
+            else values.get("VWORLD_API_KEY") or values.get("VWORLD_KEY")
         )
-        domain = kwargs.pop("domain", None) or values.get("VWORLD_DOMAIN")
+        domain = kwargs.pop("domain") if "domain" in kwargs else values.get("VWORLD_DOMAIN")
         return cls(api_key=api_key, domain=domain, **kwargs)
 
     def _require_http(self) -> _VworldHttp:
@@ -125,29 +148,37 @@ class VworldClient:
         return self._http
 
     def _with_domain(self, params: JsonObject, domain: str | None = None) -> JsonObject:
-        selected = domain if domain is not None else self.domain
-        if selected:
-            params["domain"] = selected
+        if domain is not None:
+            params["domain"] = domain
+        elif self.domain:
+            params["domain"] = self.domain
         return params
 
     # Search API 2.0
     def search(
         self,
         query: str,
-        type: str,
+        type: str | SearchType,
         *,
-        category: str | list[str] | tuple[str, ...] | None = None,
+        category: (
+            str
+            | AddressCategory
+            | DistrictCategory
+            | list[str | AddressCategory | DistrictCategory]
+            | tuple[str | AddressCategory | DistrictCategory, ...]
+            | None
+        ) = None,
         size: int = 10,
         page: int = 1,
-        bbox: str | tuple[float, float, float, float] | None = None,
-        crs: str = _DEFAULT_CRS,
+        bbox: BBoxLike | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
         callback: str | None = None,
     ) -> JsonObject:
         """Call Search API 2.0 (``/req/search``)."""
 
         if not query:
             raise VworldInvalidParameterError("query must not be empty")
-        normalized_type = type.lower()
+        normalized_type = _text_value(type).lower()
         if normalized_type not in {"place", "address", "district", "road"}:
             raise VworldInvalidParameterError("type must be place, address, district, or road")
         if normalized_type in {"address", "district"} and category is None:
@@ -179,12 +210,24 @@ class VworldClient:
 
         return self.search(query, "place", **kwargs)
 
-    def search_address(self, query: str, *, category: str = "road", **kwargs: Any) -> JsonObject:
+    def search_address(
+        self,
+        query: str,
+        *,
+        category: str | AddressCategory = AddressCategory.ROAD,
+        **kwargs: Any,
+    ) -> JsonObject:
         """Search road or parcel addresses."""
 
         return self.search(query, "address", category=category, **kwargs)
 
-    def search_district(self, query: str, *, category: str = "L4", **kwargs: Any) -> JsonObject:
+    def search_district(
+        self,
+        query: str,
+        *,
+        category: str | DistrictCategory = DistrictCategory.LEVEL4,
+        **kwargs: Any,
+    ) -> JsonObject:
         """Search administrative districts."""
 
         return self.search(query, "district", category=category, **kwargs)
@@ -198,18 +241,18 @@ class VworldClient:
     def get_coord(
         self,
         address: str,
-        type: str,
+        type: str | AddressType,
         *,
         refine: bool = True,
         simple: bool = False,
-        crs: str = _DEFAULT_CRS,
+        crs: str | Crs = _DEFAULT_CRS,
         callback: str | None = None,
     ) -> JsonObject:
         """Convert an address to coordinates via Geocoder API 2.0."""
 
         if not address:
             raise VworldInvalidParameterError("address must not be empty")
-        normalized_type = type.lower()
+        normalized_type = _text_value(type).lower()
         if normalized_type not in {"road", "parcel"}:
             raise VworldInvalidParameterError("type must be road or parcel")
         params = {
@@ -227,24 +270,29 @@ class VworldClient:
         }
         return self._require_http().get_json("/req/address", params)
 
-    def geocode(self, address: str, type: str = "road", **kwargs: Any) -> JsonObject:
+    def geocode(
+        self,
+        address: str,
+        type: str | AddressType = AddressType.ROAD,
+        **kwargs: Any,
+    ) -> JsonObject:
         """Alias for :meth:`get_coord`."""
 
         return self.get_coord(address, type, **kwargs)
 
     def get_address(
         self,
-        point_value: str | tuple[float, float],
+        point_value: PointLike,
         *,
-        type: str = "both",
+        type: str | ReverseGeocodeType = ReverseGeocodeType.BOTH,
         zipcode: bool = True,
         simple: bool = False,
-        crs: str = _DEFAULT_CRS,
+        crs: str | Crs = _DEFAULT_CRS,
         callback: str | None = None,
     ) -> JsonObject:
         """Convert coordinates to road and/or parcel addresses."""
 
-        normalized_type = type.lower()
+        normalized_type = _text_value(type).lower()
         if normalized_type not in {"road", "parcel", "both"}:
             raise VworldInvalidParameterError("type must be road, parcel, or both")
         params = {
@@ -262,10 +310,15 @@ class VworldClient:
         }
         return self._require_http().get_json("/req/address", params)
 
-    def reverse_geocode(self, point_value: str | tuple[float, float], **kwargs: Any) -> JsonObject:
+    def reverse_geocode(self, point_value: PointLike, **kwargs: Any) -> JsonObject:
         """Alias for :meth:`get_address`."""
 
         return self.get_address(point_value, **kwargs)
+
+    def reverse_geocode_latlon(self, lat: float, lon: float, **kwargs: Any) -> JsonObject:
+        """Reverse geocode a WGS84 latitude/longitude point."""
+
+        return self.get_address(LatLon(lat=lat, lon=lon), **kwargs)
 
     # 2D Data API 2.0
     def get_data_feature(
@@ -280,7 +333,7 @@ class VworldClient:
         buffer: int | float | None = None,
         size: int = 10,
         page: int = 1,
-        crs: str = _DEFAULT_CRS,
+        crs: str | Crs = _DEFAULT_CRS,
         callback: str | None = None,
         domain: str | None = None,
     ) -> JsonObject:
@@ -317,7 +370,7 @@ class VworldClient:
         self,
         data: str,
         *,
-        crs: str = _DEFAULT_CRS,
+        crs: str | Crs = _DEFAULT_CRS,
         callback: str | None = None,
         domain: str | None = None,
     ) -> JsonObject:
@@ -380,11 +433,11 @@ class VworldClient:
         self,
         *,
         layers: str | list[str] | tuple[str, ...],
-        bbox: str | tuple[float, float, float, float],
+        bbox: BBoxLike,
         width: int,
         height: int,
         styles: str | list[str] | tuple[str, ...] | None = None,
-        crs: str = _DEFAULT_OGC_CRS,
+        crs: str | Crs = _DEFAULT_OGC_CRS,
         format: str = "image/png",
         transparent: bool = False,
         bgcolor: str = "0xFFFFFF",
@@ -418,13 +471,13 @@ class VworldClient:
         *,
         layers: str | list[str] | tuple[str, ...],
         query_layers: str | list[str] | tuple[str, ...],
-        bbox: str | tuple[float, float, float, float],
+        bbox: BBoxLike,
         width: int,
         height: int,
         i: int,
         j: int,
         styles: str | list[str] | tuple[str, ...] | None = None,
-        crs: str = _DEFAULT_OGC_CRS,
+        crs: str | Crs = _DEFAULT_OGC_CRS,
         info_format: str = "text/xml",
         feature_count: int | None = None,
         version: str = "1.3.0",
@@ -506,10 +559,10 @@ class VworldClient:
         self,
         type_name: str | list[str] | tuple[str, ...],
         *,
-        bbox: str | tuple[float, float, float, float] | None = None,
+        bbox: BBoxLike | None = None,
         property_name: str | list[str] | tuple[str, ...] | None = None,
         max_features: int | None = None,
-        srs_name: str = _DEFAULT_OGC_CRS,
+        srs_name: str | Crs = _DEFAULT_OGC_CRS,
         output: str = "GML2",
         exceptions: str = "text/xml",
         filter: str | None = None,
@@ -545,8 +598,8 @@ class VworldClient:
         layer: str,
         *,
         style: str | None = None,
-        type: str = "ALL",
-        format: str = "png",
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
     ) -> BinaryResponse:
         """Call Image API ``GetLegendGraphic``."""
 
@@ -557,8 +610,8 @@ class VworldClient:
         layer: str,
         *,
         style: str | None = None,
-        type: str = "ALL",
-        format: str = "png",
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
     ) -> BinaryResponse:
         """Call Image API ``GetLegendStyle``."""
 
@@ -593,12 +646,13 @@ class VworldClient:
         layer: str,
         *,
         style: str | None = None,
-        type: str = "ALL",
-        format: str = "png",
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
     ) -> JsonObject:
         if not layer:
             raise VworldInvalidParameterError("layer must not be empty")
-        if type.upper() not in {"ALL", "LAYER", "SUB"}:
+        type_value = _text_value(type).upper()
+        if type_value not in {"ALL", "LAYER", "SUB"}:
             raise VworldInvalidParameterError("type must be ALL, LAYER, or SUB")
         return {
             "service": "image",
@@ -608,7 +662,7 @@ class VworldClient:
             "errorformat": _DEFAULT_ERROR_FORMAT,
             "layer": layer,
             "style": style,
-            "type": type.upper(),
+            "type": type_value,
         }
 
     def static_map_url(self, **kwargs: Any) -> str:
@@ -628,12 +682,12 @@ class VworldClient:
     def _static_map_params(
         self,
         *,
-        center: str | tuple[float, float],
+        center: PointLike,
         zoom: int,
         size: str | tuple[int, int],
-        basemap: str = "GRAPHIC",
-        crs: str = _DEFAULT_CRS,
-        format: str = "png",
+        basemap: str | StaticMapBase = StaticMapBase.GRAPHIC,
+        crs: str | Crs = _DEFAULT_CRS,
+        format: str | ImageFormat = ImageFormat.PNG,
         layers: str | list[str] | tuple[str, ...] | None = None,
         styles: str | list[str] | tuple[str, ...] | None = None,
         marker: str | list[str] | tuple[str, ...] | None = None,
@@ -657,6 +711,16 @@ class VworldClient:
             "marker": marker,
             "route": route,
         }
+
+    def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
+        """Call StaticMap with a WGS84 latitude/longitude center."""
+
+        return self.static_map(center=LatLon(lat=lat, lon=lon), **kwargs)
+
+    def static_map_latlon_url(self, lat: float, lon: float, **kwargs: Any) -> str:
+        """Build a StaticMap URL with a WGS84 latitude/longitude center."""
+
+        return self.static_map_url(center=LatLon(lat=lat, lon=lon), **kwargs)
 
     # WMTS/TMS tile endpoints
     def wmts_tile_url(

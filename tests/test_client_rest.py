@@ -12,7 +12,7 @@ BASE = "https://api.vworld.kr"
 
 
 def _query(call) -> dict[str, list[str]]:
-    return parse_qs(urlparse(call.request.url).query)
+    return parse_qs(urlparse(call.request.url).query, keep_blank_values=True)
 
 
 @responses.activate
@@ -80,6 +80,25 @@ def test_from_env_file_loads_key_and_domain(tmp_path):
     assert client.domain == "example.com"
 
 
+def test_explicit_blank_domain_is_preserved(monkeypatch):
+    monkeypatch.setenv("VWORLD_DOMAIN", "example.com")
+
+    client = VworldClient("test-key", domain="")
+
+    assert client.domain == ""
+
+
+@responses.activate
+def test_blank_client_domain_suppresses_env_domain(monkeypatch, ok_payload):
+    monkeypatch.setenv("VWORLD_DOMAIN", "example.com")
+    responses.add(responses.GET, BASE + "/req/data", json=ok_payload)
+
+    client = VworldClient("test-key", domain="")
+    client.get_data_feature("LT_C_ADEMD_INFO")
+
+    assert "domain" not in _query(responses.calls[0])
+
+
 @responses.activate
 def test_search_address_helper_adds_default_category(client, ok_payload):
     responses.add(responses.GET, BASE + "/req/search", json=ok_payload)
@@ -144,6 +163,15 @@ def test_data_feature_query_params_and_domain(client, ok_payload):
     assert query["attribute"] == ["true"]
     assert query["buffer"] == ["10"]
     assert query["domain"] == ["example.com"]
+
+
+@responses.activate
+def test_data_feature_accepts_explicit_blank_domain(client, ok_payload):
+    responses.add(responses.GET, BASE + "/req/data", json=ok_payload)
+
+    client.get_data_feature("LT_C_ADEMD_INFO", domain="")
+
+    assert _query(responses.calls[0])["domain"] == [""]
 
 
 @responses.activate

@@ -48,4 +48,4 @@ VWORLD_API_KEY="issued-key"
 VWORLD_DOMAIN="registered-domain"
 ```
 
-The domain is important for WMS/WFS capabilities. During local verification on 2026-05-01, REST, Geocoder, image, WMTS, and TMS worked with the key alone. WMS/WFS capabilities were reliable when `domain=www.vworld.kr` was supplied. The 2D Data smoke test intentionally passes `domain=""` because this key returned `INCORRECT_KEY` for `/req/data` when `domain=www.vworld.kr` was attached.
+Live domain behavior is not uniform across VWorld endpoints. During local verification on 2026-05-06, Search, Geocoder, image, WMTS, and TMS worked with the issued key. WMS/WFS capabilities were most reliable with an explicit blank `domain=` query, while the 2D Data smoke test used a client whose default domain was suppressed. The live tests retry short smoke calls because VWorld can intermittently return `INCORRECT_KEY` for the same key and request shape.

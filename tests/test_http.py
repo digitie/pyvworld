@@ -178,3 +178,7 @@ def test_build_url_can_omit_key():
     assert http.build_url("/req/wmts/1.0.0/test-key/Base/11/1/2.png", include_key=False) == (
         "https://api.vworld.kr/req/wmts/1.0.0/test-key/Base/11/1/2.png"
     )
+
+
+def test_http_repr_does_not_expose_api_key():
+    assert "secret-key" not in repr(_VworldHttp("secret-key", retry_backoff=0))

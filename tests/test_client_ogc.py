@@ -11,7 +11,7 @@ BASE = "https://api.vworld.kr"
 
 
 def _query(call) -> dict[str, list[str]]:
-    return parse_qs(urlparse(call.request.url).query)
+    return parse_qs(urlparse(call.request.url).query, keep_blank_values=True)
 
 
 @responses.activate
@@ -103,6 +103,15 @@ def test_capabilities_and_describe_feature_type(client):
     assert _query(responses.calls[1])["SERVICE"] == ["WFS"]
     assert _query(responses.calls[2])["REQUEST"] == ["DescribeFeatureType"]
     assert _query(responses.calls[2])["TYPENAME"] == ["lt_c_uq111,lt_c_uq112"]
+
+
+@responses.activate
+def test_ogc_accepts_explicit_blank_domain(client):
+    responses.add(responses.GET, BASE + "/req/wms", body="<wms/>")
+
+    assert client.wms_get_capabilities(domain="").text == "<wms/>"
+
+    assert _query(responses.calls[0])["domain"] == [""]
 
 
 @pytest.mark.parametrize(

@@ -33,7 +33,7 @@ def _new_session() -> Any:
 
 @dataclass(slots=True)
 class _VworldHttp:
-    api_key: str
+    api_key: str = field(repr=False)
     timeout: float = 10.0
     max_retries: int = 2
     retry_backoff: float = 0.5

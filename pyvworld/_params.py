@@ -8,6 +8,7 @@ from math import isfinite
 from typing import Any
 
 from .exceptions import VworldInvalidParameterError
+from .models import BBox, BBoxLike, LatLon, LonLat, PointLike
 
 Params = dict[str, Any]
 
@@ -41,22 +42,26 @@ def csv(value: str | Iterable[Any] | None) -> str | None:
     return ",".join(str(query_value(item)) for item in value)
 
 
-def bbox(value: str | tuple[float, float, float, float] | None) -> str | None:
+def bbox(value: BBoxLike | None) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
         return value
+    if isinstance(value, BBox):
+        value = value.as_tuple()
     if len(value) != 4:
         raise VworldInvalidParameterError("bbox must contain minx, miny, maxx, maxy")
     _require_finite(value, "bbox")
     return ",".join(_format_number(part) for part in value)
 
 
-def point(value: str | tuple[float, float]) -> str:
+def point(value: PointLike) -> str:
     if isinstance(value, str):
         if "," not in value:
             raise VworldInvalidParameterError("point must use the 'x,y' format")
         return value
+    if isinstance(value, (LatLon, LonLat)):
+        value = value.as_xy()
     if len(value) != 2:
         raise VworldInvalidParameterError("point must contain x and y")
     _require_finite(value, "point")

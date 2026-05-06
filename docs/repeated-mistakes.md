@@ -43,6 +43,8 @@ StaticMap 문서 기준:
 
 - `zoom`: 6~18
 - `size`: 최대 `1024,1024`
+- `basemap`: `NONE`, `GRAPHIC`, `GRAPHIC_WHITE`, `GRAPHIC_NIGHT`, `PHOTO`, `PHOTO_HYBRID`
+- `format`: `png`, `jpeg`, `bmp`
 
 초과 요청은 서버에 보내기 전에 `VworldInvalidParameterError`로 막습니다.
 
@@ -52,6 +54,14 @@ StaticMap 문서 기준:
 
 ## WMS/WFS domain 파라미터
 
-REST API는 키만으로도 동작하는 경우가 많지만, WMS/WFS는 인증키에 등록된 도메인을 `domain=`으로 함께 보내야 안정적입니다. 로컬 라이브 테스트에서는 `.env`에 `VWORLD_DOMAIN`을 저장하고 테스트 fixture가 WMS/WFS에 사용합니다.
+REST API는 키만으로도 동작하는 경우가 많지만, WMS/WFS는 인증키와 `domain=` 조합에 민감합니다. 같은 키라도 실제 도메인 값, 빈 `domain=`, domain 생략 중 어느 쪽이 통과하는지가 엔드포인트마다 달라질 수 있습니다.
 
-단, 같은 키라도 `/req/data`에 domain을 붙이면 `INCORRECT_KEY`가 날 수 있습니다. 이 경우 `client.get_data_feature(..., domain="")`처럼 명시적으로 빈 domain을 전달해 클라이언트 기본 domain 주입을 끕니다.
+규칙: `domain=None`은 클라이언트 기본 domain을 사용하고, 메서드에 `domain=""`을 넘기면 빈 `domain=` 쿼리를 보냅니다. 환경 변수 domain을 완전히 억제하려면 `VworldClient(api_key, domain="")`처럼 별도 클라이언트를 만들고 메서드에는 `domain`을 넘기지 않습니다. 라이브 테스트에서 이 차이를 반복해서 확인합니다.
+
+## 인증키 노출 방지
+
+라이브 테스트 실패 로그에 `_VworldHttp(api_key=...)` 형태로 키가 찍히면 안 됩니다. `_VworldHttp`의 `api_key`는 repr에서 제외하고, 테스트/문서에는 원문 키가 들어간 URL을 남기지 않습니다.
+
+## 위경도 순서 혼동
+
+VWorld `point`는 항상 `x,y` 순서입니다. EPSG:4326에서 `x,y`는 `lon,lat`입니다. 사용자가 “위경도”라고 말하면 보통 `lat,lon` 순서로 생각하므로 공개 예제와 새 코드에서는 `latlon(lat, lon)` 또는 `LatLon(lat=..., lon=...)`을 우선 사용합니다. 기존 튜플 `(lon, lat)` 지원은 호환성을 위해 유지합니다.
