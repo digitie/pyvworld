@@ -2,6 +2,11 @@
 
 이 저장소에서 작업할 때 지켜야 할 규칙입니다.
 
+## 작업 환경 규칙
+
+- 이 환경에서 `rg`가 실행 권한 문제로 막히면 `Get-ChildItem -Recurse -File`과 `Select-String`으로 파일 목록/검색을 우회합니다.
+- PowerShell로 UTF-8 문서를 읽을 때는 `Get-Content -Encoding UTF8`처럼 인코딩을 명시합니다.
+
 ## 구현 원칙
 
 - 공식 VWorld 문서를 먼저 확인합니다.
@@ -23,3 +28,5 @@
 - 구현 범위는 `docs/api-coverage.md`에 갱신합니다.
 - 반복 실수는 `docs/repeated-mistakes.md`에 남깁니다.
 - 사용자 예시는 README에 짧고 실행 가능한 형태로 둡니다.
+- 문서에서 파일 위치는 프로젝트 기준 상대 경로로 적고, 로컬 드라이브를 포함한 절대 경로를 남기지 않습니다.
+- Python docstring과 주석 같은 내부 문서도 한글로 작성합니다.

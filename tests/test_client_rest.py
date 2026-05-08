@@ -203,3 +203,74 @@ def test_search_district_and_road_helpers(client, ok_payload):
     assert _query(responses.calls[0])["type"] == ["district"]
     assert _query(responses.calls[0])["category"] == ["L4"]
     assert _query(responses.calls[1])["type"] == ["road"]
+
+
+@responses.activate
+def test_iter_search_items_follows_pages_and_caps_items(client):
+    responses.add(
+        responses.GET,
+        BASE + "/req/search",
+        json={
+            "response": {
+                "status": "OK",
+                "record": {"total": "4", "current": "2"},
+                "page": {"total": "2", "current": "1", "size": "2"},
+                "result": {"items": [{"id": "1"}, {"id": "2"}]},
+            }
+        },
+    )
+    responses.add(
+        responses.GET,
+        BASE + "/req/search",
+        json={
+            "response": {
+                "status": "OK",
+                "record": {"total": "4", "current": "2"},
+                "page": {"total": "2", "current": "2", "size": "2"},
+                "result": {"items": [{"id": "3"}, {"id": "4"}]},
+            }
+        },
+    )
+
+    items = list(client.iter_search_items("판교", "place", size=2, max_items=3))
+
+    assert [item["id"] for item in items] == ["1", "2", "3"]
+    assert _query(responses.calls[0])["page"] == ["1"]
+    assert _query(responses.calls[1])["page"] == ["2"]
+
+
+@responses.activate
+def test_iter_data_feature_pages_preserves_request_params(client):
+    responses.add(
+        responses.GET,
+        BASE + "/req/data",
+        json={
+            "response": {
+                "status": "OK",
+                "record": {"total": "1", "current": "1"},
+                "page": {"total": "1", "current": "3", "size": "1"},
+                "result": {"items": [{"id": "feature"}]},
+            }
+        },
+    )
+
+    pages = list(
+        client.iter_data_feature_pages(
+            "LT_C_ADEMD_INFO",
+            attr_filter=["emd_cd:=:11650108"],
+            columns=["emd_cd"],
+            geometry=False,
+            size=1,
+            start_page=3,
+            domain="",
+        )
+    )
+
+    assert pages[0]["response"]["status"] == "OK"
+    query = _query(responses.calls[0])
+    assert query["data"] == ["LT_C_ADEMD_INFO"]
+    assert query["page"] == ["3"]
+    assert query["attrFilter"] == ["emd_cd:=:11650108"]
+    assert query["columns"] == ["emd_cd"]
+    assert query["geometry"] == ["false"]
+    assert query["domain"] == [""]

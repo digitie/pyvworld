@@ -19,6 +19,8 @@ python -m mypy pyvworld
 - OGC tests assert WMS/WFS uppercase parameter names and response wrappers.
 - Image/tile tests assert StaticMap, legend, WMTS, and TMS URL shapes.
 - Catalog tests assert the official 158-entry count and all entries being 2.0.
+- Pagination tests cover `response.page` traversal, item extraction, and loop guards.
+- Metadata tests cover credential sanitization for query `key=` and WMTS/TMS path keys.
 
 ## Live Tests
 

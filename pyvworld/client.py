@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 from urllib.parse import quote
 
 from ._http import _VworldHttp
@@ -40,8 +41,18 @@ from .models import (
     TextResponse,
     TileLayer,
 )
+from .pagination import iter_pages as iter_vworld_pages
+from .pagination import response_items
 
 JsonObject = dict[str, Any]
+SearchCategory: TypeAlias = (
+    str
+    | AddressCategory
+    | DistrictCategory
+    | list[str | AddressCategory | DistrictCategory]
+    | tuple[str | AddressCategory | DistrictCategory, ...]
+)
+StringList: TypeAlias = str | list[str] | tuple[str, ...]
 
 
 _REST_VERSION = "2.0"
@@ -160,14 +171,7 @@ class VworldClient:
         query: str,
         type: str | SearchType,
         *,
-        category: (
-            str
-            | AddressCategory
-            | DistrictCategory
-            | list[str | AddressCategory | DistrictCategory]
-            | tuple[str | AddressCategory | DistrictCategory, ...]
-            | None
-        ) = None,
+        category: SearchCategory | None = None,
         size: int = 10,
         page: int = 1,
         bbox: BBoxLike | None = None,
@@ -236,6 +240,74 @@ class VworldClient:
         """Search road names."""
 
         return self.search(query, "road", **kwargs)
+
+    def iter_search_pages(
+        self,
+        query: str,
+        type: str | SearchType,
+        *,
+        category: SearchCategory | None = None,
+        size: int = 1000,
+        start_page: int = 1,
+        max_pages: int = 100,
+        max_items: int | None = None,
+        bbox: BBoxLike | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+    ) -> Iterator[JsonObject]:
+        """VWorld ``response.page`` 메타데이터를 따라 Search API 페이지를 순회합니다."""
+
+        yield from iter_vworld_pages(
+            lambda page: self.search(
+                query,
+                type,
+                category=category,
+                size=size,
+                page=page,
+                bbox=bbox,
+                crs=crs,
+                callback=callback,
+            ),
+            start_page=start_page,
+            max_pages=max_pages,
+            max_items=max_items,
+        )
+
+    def iter_search_items(
+        self,
+        query: str,
+        type: str | SearchType,
+        *,
+        category: SearchCategory | None = None,
+        size: int = 1000,
+        start_page: int = 1,
+        max_pages: int = 100,
+        max_items: int | None = None,
+        bbox: BBoxLike | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Search API 결과 아이템을 여러 페이지에 걸쳐 순회합니다."""
+
+        yielded = 0
+        pages = self.iter_search_pages(
+            query,
+            type,
+            category=category,
+            size=size,
+            start_page=start_page,
+            max_pages=max_pages,
+            max_items=max_items,
+            bbox=bbox,
+            crs=crs,
+            callback=callback,
+        )
+        for payload in pages:
+            for item in response_items(payload):
+                if max_items is not None and yielded >= max_items:
+                    return
+                yield item
+                yielded += 1
 
     # Geocoder API 2.0
     def get_coord(
@@ -326,8 +398,8 @@ class VworldClient:
         data: str,
         *,
         geom_filter: str | None = None,
-        attr_filter: str | list[str] | tuple[str, ...] | None = None,
-        columns: str | list[str] | tuple[str, ...] | None = None,
+        attr_filter: StringList | None = None,
+        columns: StringList | None = None,
         geometry: bool = True,
         attribute: bool = True,
         buffer: int | float | None = None,
@@ -365,6 +437,90 @@ class VworldClient:
             domain,
         )
         return self._require_http().get_json("/req/data", params)
+
+    def iter_data_feature_pages(
+        self,
+        data: str,
+        *,
+        geom_filter: str | None = None,
+        attr_filter: StringList | None = None,
+        columns: StringList | None = None,
+        geometry: bool = True,
+        attribute: bool = True,
+        buffer: int | float | None = None,
+        size: int = 1000,
+        start_page: int = 1,
+        max_pages: int = 100,
+        max_items: int | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+        domain: str | None = None,
+    ) -> Iterator[JsonObject]:
+        """VWorld 페이지네이션을 따라 2D Data ``GetFeature`` 페이지를 순회합니다."""
+
+        yield from iter_vworld_pages(
+            lambda page: self.get_data_feature(
+                data,
+                geom_filter=geom_filter,
+                attr_filter=attr_filter,
+                columns=columns,
+                geometry=geometry,
+                attribute=attribute,
+                buffer=buffer,
+                size=size,
+                page=page,
+                crs=crs,
+                callback=callback,
+                domain=domain,
+            ),
+            start_page=start_page,
+            max_pages=max_pages,
+            max_items=max_items,
+        )
+
+    def iter_data_feature_items(
+        self,
+        data: str,
+        *,
+        geom_filter: str | None = None,
+        attr_filter: StringList | None = None,
+        columns: StringList | None = None,
+        geometry: bool = True,
+        attribute: bool = True,
+        buffer: int | float | None = None,
+        size: int = 1000,
+        start_page: int = 1,
+        max_pages: int = 100,
+        max_items: int | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+        domain: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """2D Data ``GetFeature`` 결과 아이템을 여러 페이지에 걸쳐 순회합니다."""
+
+        yielded = 0
+        pages = self.iter_data_feature_pages(
+            data,
+            geom_filter=geom_filter,
+            attr_filter=attr_filter,
+            columns=columns,
+            geometry=geometry,
+            attribute=attribute,
+            buffer=buffer,
+            size=size,
+            start_page=start_page,
+            max_pages=max_pages,
+            max_items=max_items,
+            crs=crs,
+            callback=callback,
+            domain=domain,
+        )
+        for payload in pages:
+            for item in response_items(payload):
+                if max_items is not None and yielded >= max_items:
+                    return
+                yield item
+                yielded += 1
 
     def get_data_feature_type(
         self,

@@ -12,6 +12,7 @@ VWorld(브이월드) HTTP API를 Python에서 쓰기 쉽게 감싼 비공식 클
 - WMS/WFS API 2.0 레퍼런스: `GetCapabilities`, `GetMap`, `GetFeatureInfo`, `DescribeFeatureType`, `GetFeature`
 - 범례이미지/StaticMap API 2.0: 이미지 바이트 응답과 URL 빌더
 - WMTS/TMS: 타일, 해외위성영상 테마 타일, capabilities/resource URL
+- 페이지 반복/아이템 추출 헬퍼와 인증키를 제거한 메타데이터/캐시 키 유틸
 - 네트워크 없이 검증되는 fixture/mock 기반 테스트
 
 JS 지도 SDK, WebGL 3D 지도 SDK, 모바일/데스크톱 SDK는 Python HTTP 엔드포인트가 아니라 런타임 SDK 문서이므로 이 패키지의 함수 래핑 범위에서 제외했습니다. 범위와 근거는 [docs/api-coverage.md](docs/api-coverage.md)에 정리했습니다.
@@ -132,7 +133,21 @@ features = client.get_data_feature(
     columns=["emd_cd", "full_nm"],
 )
 print(features["response"]["result"])
+
+for item in client.iter_data_feature_items(
+    service.service_id,
+    attr_filter="emd_cd:=:11650108",
+    geometry=False,
+    size=1000,
+    max_pages=3,
+):
+    print(item)
 ```
+
+응답을 직접 다루는 코드에서는 `response_items()`와 `response_page_info()`로
+VWorld의 `response.result.items`, `response.page`, `response.record` 구조를
+일관되게 읽을 수 있습니다. 로그나 캐시 키에는 `sanitize_request_params()`와
+`make_cache_key()`를 쓰면 `key=` 값이 섞이지 않습니다.
 
 WMS/WFS:
 

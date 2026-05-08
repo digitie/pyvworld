@@ -20,6 +20,13 @@
 
 Public wrappers accept the original string values and typed helpers. Enums cover common documented parameter sets such as search/address categories, CRS, legend type, image format, StaticMap basemap, and tile layers. `LatLon`, `LonLat`, `BBox`, `BinaryResponse`, and `TextResponse` are frozen Pydantic v2 models, so external programs can use `model_validate()`, `model_dump()`, and JSON schema generation without changing existing tuple inputs.
 
+## General-Purpose Helpers
+
+- `iter_search_pages` / `iter_search_items` follow Search API `response.page` metadata while preserving the base `search` parameter validation.
+- `iter_data_feature_pages` / `iter_data_feature_items` do the same for 2D Data `GetFeature`.
+- `response_page_info`, `has_next_page`, `next_page_no`, and `response_items` normalize the documented `response.record`, `response.page`, and `response.result.items` JSON structure.
+- `VworldResponseMetadata`, `sanitize_request_params`, `request_params_from_url`, `redact_credentials_in_text`, and `make_cache_key` are public utilities for logging/cache integrations without leaking `key=` query values or WMTS/TMS path keys.
+
 ## Not Implemented
 
 These are not Python HTTP endpoint wrappers:
