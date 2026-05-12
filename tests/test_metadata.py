@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from pyvworld import (
+from vworld import (
     VworldResponseMetadata,
     make_cache_key,
     make_response_metadata,
@@ -64,7 +64,7 @@ def test_cache_key_is_stable_and_ignores_credentials() -> None:
     second = make_cache_key("/req/search", {"page": 1, "key": "two", "query": "판교"})
 
     assert first == second
-    assert first.startswith("pyvworld:v1:")
+    assert first.startswith("vworld:v1:")
 
 
 def test_raw_to_json_safe_converts_dates_enums_and_tuples() -> None:

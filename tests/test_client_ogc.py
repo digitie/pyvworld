@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 import responses
 
-from pyvworld.exceptions import VworldInvalidParameterError
+from vworld.exceptions import VworldInvalidParameterError
 
 BASE = "https://api.vworld.kr"
 

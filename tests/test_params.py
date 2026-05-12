@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyvworld import TileLayer
-from pyvworld._params import (
+from vworld import TileLayer
+from vworld._params import (
     bbox,
     clean_params,
     csv,
@@ -13,7 +13,7 @@ from pyvworld._params import (
     validate_page_size,
     validate_static_size,
 )
-from pyvworld.exceptions import VworldInvalidParameterError
+from vworld.exceptions import VworldInvalidParameterError
 
 
 def test_clean_params_converts_bool_enum_and_lists():

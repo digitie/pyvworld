@@ -1,8 +1,8 @@
-"""Exception hierarchy for pyvworld."""
+"""vworld 예외 계층."""
 
 
 class VworldError(Exception):
-    """Base class for all pyvworld exceptions."""
+    """모든 vworld 예외의 기준 클래스."""
 
 
 class VworldAuthError(VworldError):

@@ -1,6 +1,6 @@
 # API Coverage
 
-이 문서는 현재 `pyvworld`가 어떤 VWorld API를 구현했는지, 무엇을 의도적으로 제외했는지 기록합니다.
+이 문서는 현재 `vworld`가 어떤 VWorld API를 구현했는지, 무엇을 의도적으로 제외했는지 기록합니다.
 
 ## Implemented
 
@@ -44,7 +44,7 @@ If a future VWorld page exposes a stable HTTP endpoint for one of these areas, a
 
 - Official list count: 158 entries
 - Generated date: 2026-05-01
-- Code: `pyvworld/catalog.py`
+- Code: `src/vworld/catalog.py`
 - Markdown: `docs/data-services.md`
 
 All catalog entries have `version == "2.0"`. Tests assert the count and a few sentinel IDs to catch accidental truncation.

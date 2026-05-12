@@ -1,9 +1,9 @@
 ---
-name: pyvworld-builder
-description: Use this skill when building, extending, testing, or documenting the pyvworld Python client for VWorld REST, OGC, image, WMTS, or TMS APIs.
+name: vworld-builder
+description: Use this skill when building, extending, testing, or documenting the vworld Python client for VWorld REST, OGC, image, WMTS, or TMS APIs.
 ---
 
-# pyvworld Builder
+# vworld Builder
 
 ## Read First
 
@@ -17,15 +17,15 @@ description: Use this skill when building, extending, testing, or documenting th
 - WMS/WFS OGC protocol versions are not VWorld API 1.0.
 - WMTS/TMS put the key in the path, not in a query parameter.
 - Default tests must be offline.
-- `pyvworld/_http.py` owns error mapping.
+- `src/vworld/_http.py` owns error mapping.
 
 ## Required Checks
 
 ```bash
-python -m compileall pyvworld tests
+python -m compileall src/vworld tests
 python -m pytest
 python -m ruff check .
-python -m mypy pyvworld
+python -m mypy src/vworld
 ```
 
 ## Adding an Endpoint

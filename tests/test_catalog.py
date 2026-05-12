@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyvworld import DATA_SERVICE_BY_ID, DATA_SERVICES, get_data_service
-from pyvworld.exceptions import VworldInvalidParameterError
+from vworld import DATA_SERVICE_BY_ID, DATA_SERVICES, get_data_service
+from vworld.exceptions import VworldInvalidParameterError
 
 
 def test_catalog_contains_current_official_2d_data_count():

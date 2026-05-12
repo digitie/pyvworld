@@ -5,8 +5,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 import responses
 
-from pyvworld import VworldClient
-from pyvworld.exceptions import VworldAuthError, VworldInvalidParameterError
+from vworld import VworldClient
+from vworld.exceptions import VworldAuthError, VworldInvalidParameterError
 
 BASE = "https://api.vworld.kr"
 

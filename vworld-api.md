@@ -6,7 +6,7 @@
 
 ## 구현 대상
 
-| API | 공식 문서 | pyvworld 메서드 |
+| API | 공식 문서 | vworld 메서드 |
 |---|---|---|
 | 검색 API 2.0 | `/dev/v4dv_search2_s001.do` | `search`, `search_place`, `search_address`, `search_district`, `search_road` |
 | Geocoder API 2.0 | `/dev/v4dv_geocoderguide2_s001.do`, `s002.do` | `get_coord`, `geocode`, `get_address`, `reverse_geocode` |
@@ -27,7 +27,7 @@
 
 ## 2D 데이터 서비스 카탈로그
 
-공식 2D데이터 API 2.0 목록은 2026-05-01 기준 158건입니다. `pyvworld.catalog.DATA_SERVICES`와 [docs/data-services.md](docs/data-services.md)에 고정해 두었습니다.
+공식 2D데이터 API 2.0 목록은 2026-05-01 기준 158건입니다. `vworld.catalog.DATA_SERVICES`와 [docs/data-services.md](docs/data-services.md)에 고정해 두었습니다.
 
 카탈로그는 서비스 ID 조회 보조용입니다. API 호출 자체는 공식 `/req/data` 엔드포인트 하나를 사용하며, `data=`에 서비스 ID를 넣습니다.
 

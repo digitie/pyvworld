@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from pyvworld import VworldClient
+from vworld import VworldClient
 
 
 @pytest.fixture

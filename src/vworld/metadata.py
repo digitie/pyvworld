@@ -111,7 +111,7 @@ def make_cache_key(
     endpoint: str,
     params: Mapping[str, Any] | None = None,
     *,
-    namespace: str = "pyvworld:v1",
+    namespace: str = "vworld:v1",
 ) -> str:
     """엔드포인트와 정리된 요청값으로 안정적인 캐시 키를 만듭니다."""
 

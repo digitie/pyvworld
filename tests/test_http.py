@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 import responses
 
-from pyvworld._http import _VworldHttp
-from pyvworld.exceptions import (
+from vworld._http import _VworldHttp
+from vworld.exceptions import (
     VworldAuthError,
     VworldNetworkError,
     VworldNoDataError,

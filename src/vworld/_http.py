@@ -22,7 +22,7 @@ def _load_requests() -> Any:
         import requests
     except ModuleNotFoundError as exc:
         raise VworldNetworkError(
-            "requests is required; install pyvworld dependencies first"
+            "requests is required; install python-vworld-api dependencies first"
         ) from exc
     return requests
 

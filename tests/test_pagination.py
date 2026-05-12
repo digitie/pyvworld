@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyvworld.exceptions import VworldInvalidParameterError, VworldServerError
-from pyvworld.pagination import (
+from vworld.exceptions import VworldInvalidParameterError, VworldServerError
+from vworld.pagination import (
     has_next_page,
     iter_pages,
     next_page_no,

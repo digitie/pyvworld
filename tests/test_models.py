@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from pyvworld import (
+from vworld import (
     BBox,
     Crs,
     ImageFormat,
@@ -14,8 +14,8 @@ from pyvworld import (
     latlon,
     lonlat,
 )
-from pyvworld._params import bbox, point
-from pyvworld.exceptions import VworldInvalidParameterError
+from vworld._params import bbox, point
+from vworld.exceptions import VworldInvalidParameterError
 
 
 def test_latlon_and_lonlat_standardize_to_vworld_xy_order():

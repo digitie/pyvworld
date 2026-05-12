@@ -5,10 +5,10 @@ The default test suite must not call the live VWorld service. Use `responses` fo
 ## Required Checks
 
 ```bash
-python -m compileall pyvworld tests
+python -m compileall src/vworld tests
 python -m pytest
 python -m ruff check .
-python -m mypy pyvworld
+python -m mypy src/vworld
 ```
 
 ## Test Strategy

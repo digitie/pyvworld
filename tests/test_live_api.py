@@ -8,8 +8,8 @@ from typing import Any, TypeVar
 
 import pytest
 
-from pyvworld import VworldClient
-from pyvworld.exceptions import VworldAuthError, VworldNetworkError, VworldServerError
+from vworld import VworldClient
+from vworld.exceptions import VworldAuthError, VworldNetworkError, VworldServerError
 
 pytestmark = pytest.mark.live
 T = TypeVar("T")
