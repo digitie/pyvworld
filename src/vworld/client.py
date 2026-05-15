@@ -102,6 +102,13 @@ def _read_env_file(path: str | os.PathLike[str]) -> dict[str, str]:
     return values
 
 
+def _normalize_api_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = "".join(str(value).split())
+    return normalized or None
+
+
 class VworldClient:
     """Client entrypoint for VWorld REST, OGC, static image, and tile endpoints."""
 
@@ -115,7 +122,11 @@ class VworldClient:
         retry_backoff: float = 0.5,
         session: Any | None = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("VWORLD_API_KEY") or os.getenv("VWORLD_KEY")
+        self.api_key = (
+            _normalize_api_key(api_key)
+            or _normalize_api_key(os.getenv("VWORLD_API_KEY"))
+            or _normalize_api_key(os.getenv("VWORLD_KEY"))
+        )
         self.domain = domain if domain is not None else os.getenv("VWORLD_DOMAIN")
         self.timeout = timeout
         self._http = (

@@ -6,8 +6,11 @@ Generated from the official 2D Data API 2.0 reference list on 2026-05-01.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from .exceptions import VworldInvalidParameterError
+
+VWORLD_AUTH_KEY_URL = "https://www.vworld.kr/mypo/mypo_apiKey_i001.do"
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +24,34 @@ class DataService:
     updated_at: str
     provider: str
     version: str = "2.0"
+
+
+@dataclass(frozen=True, slots=True)
+class ApiParameter:
+    """디버그 UI와 문서 생성에 쓸 공개 API 파라미터 설명입니다."""
+
+    name: str
+    label: str
+    kind: Literal["text", "select", "number", "checkbox", "data_service"]
+    default: str | int | bool = ""
+    required: bool = False
+    choices: tuple[str, ...] = ()
+    description: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ApiCatalogEntry:
+    """라이브러리가 디버그 실행기로 노출하는 VWorld REST API 항목입니다."""
+
+    function: str
+    label: str
+    endpoint: str
+    service: str
+    request: str
+    version: str
+    description: str
+    parameters: tuple[ApiParameter, ...]
+    auth_key_url: str = VWORLD_AUTH_KEY_URL
 
 
 DATA_SERVICES: tuple[DataService, ...] = (
@@ -1454,6 +1485,121 @@ DATA_SERVICE_BY_ID: dict[str, DataService] = {
 }
 
 
+API_CATALOG: tuple[ApiCatalogEntry, ...] = (
+    ApiCatalogEntry(
+        function="search",
+        label="Search API 2.0",
+        endpoint="/req/search",
+        service="search",
+        request="search",
+        version="2.0",
+        description="주소, 행정구역, 도로명, 장소를 검색합니다.",
+        parameters=(
+            ApiParameter("query", "Query", "text", "판교", required=True),
+            ApiParameter(
+                "type",
+                "Type",
+                "select",
+                "place",
+                choices=("place", "address", "district", "road"),
+            ),
+            ApiParameter(
+                "category",
+                "Category",
+                "text",
+                "",
+                description="address/district 검색에서 필요합니다.",
+            ),
+            ApiParameter("size", "Size", "number", 10),
+            ApiParameter("page", "Page", "number", 1),
+            ApiParameter("bbox", "BBox", "text", ""),
+            ApiParameter("crs", "CRS", "text", "EPSG:4326"),
+            ApiParameter("callback", "Callback", "text", ""),
+        ),
+    ),
+    ApiCatalogEntry(
+        function="geocode",
+        label="Geocoder getcoord 2.0",
+        endpoint="/req/address",
+        service="address",
+        request="getcoord",
+        version="2.0",
+        description="주소를 좌표로 변환합니다.",
+        parameters=(
+            ApiParameter(
+                "address",
+                "Address",
+                "text",
+                "성남시 분당구 판교로 242",
+                required=True,
+            ),
+            ApiParameter("type", "Type", "select", "road", choices=("road", "parcel")),
+            ApiParameter("refine", "Refine", "checkbox", True),
+            ApiParameter("simple", "Simple", "checkbox", False),
+            ApiParameter("crs", "CRS", "text", "EPSG:4326"),
+            ApiParameter("callback", "Callback", "text", ""),
+        ),
+    ),
+    ApiCatalogEntry(
+        function="reverse_geocode",
+        label="Geocoder getaddress 2.0",
+        endpoint="/req/address",
+        service="address",
+        request="getaddress",
+        version="2.0",
+        description="좌표를 도로명/지번 주소로 변환합니다.",
+        parameters=(
+            ApiParameter(
+                "point",
+                "Point",
+                "text",
+                "127.101313354,37.402352535",
+                required=True,
+            ),
+            ApiParameter("type", "Type", "select", "both", choices=("both", "road", "parcel")),
+            ApiParameter("zipcode", "Zipcode", "checkbox", True),
+            ApiParameter("simple", "Simple", "checkbox", False),
+            ApiParameter("crs", "CRS", "text", "EPSG:4326"),
+            ApiParameter("callback", "Callback", "text", ""),
+        ),
+    ),
+    ApiCatalogEntry(
+        function="get_data_feature",
+        label="2D Data GetFeature 2.0",
+        endpoint="/req/data",
+        service="data",
+        request="GetFeature",
+        version="2.0",
+        description="2D 데이터 서비스의 feature를 조회합니다.",
+        parameters=(
+            ApiParameter(
+                "data",
+                "Dataset",
+                "data_service",
+                "LT_C_ADEMD_INFO",
+                required=True,
+                description="공식 2D 데이터 API 2.0 서비스 카탈로그 항목입니다.",
+            ),
+            ApiParameter("geom_filter", "Geom filter", "text", ""),
+            ApiParameter("attr_filter", "Attr filter", "text", "emd_cd:=:11650108"),
+            ApiParameter("columns", "Columns", "text", "emd_cd,full_nm"),
+            ApiParameter("geometry", "Geometry", "checkbox", False),
+            ApiParameter("attribute", "Attribute", "checkbox", True),
+            ApiParameter("buffer", "Buffer", "text", ""),
+            ApiParameter("size", "Size", "number", 10),
+            ApiParameter("page", "Page", "number", 1),
+            ApiParameter("crs", "CRS", "text", "EPSG:4326"),
+            ApiParameter("callback", "Callback", "text", ""),
+            ApiParameter("domain", "Domain", "text", ""),
+        ),
+    ),
+)
+
+API_CATALOG_BY_FUNCTION: dict[str, ApiCatalogEntry] = {
+    entry.function: entry for entry in API_CATALOG
+}
+
+
 def get_data_service(service_id: str) -> DataService:
     """Return a catalog item by VWorld 2D data service ID."""
 
@@ -1463,4 +1609,28 @@ def get_data_service(service_id: str) -> DataService:
     except KeyError as exc:
         raise VworldInvalidParameterError(
             f"unknown VWorld data service id: {service_id!r}"
+        ) from exc
+
+
+def data_service_label(service: DataService | str) -> str:
+    """데이터셋을 사람이 읽기 좋은 ``이름 (ID)`` 문자열로 반환합니다."""
+
+    item = get_data_service(service) if isinstance(service, str) else service
+    return f"{item.name} ({item.service_id})"
+
+
+def list_api_catalog() -> tuple[ApiCatalogEntry, ...]:
+    """디버그 실행기가 지원하는 REST API 카탈로그 전체를 반환합니다."""
+
+    return API_CATALOG
+
+
+def get_api_catalog_entry(function_name: str) -> ApiCatalogEntry:
+    """함수 이름으로 API 카탈로그 항목을 반환합니다."""
+
+    try:
+        return API_CATALOG_BY_FUNCTION[function_name]
+    except KeyError as exc:
+        raise VworldInvalidParameterError(
+            f"unknown VWorld API catalog function: {function_name!r}"
         ) from exc

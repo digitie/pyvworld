@@ -11,3 +11,5 @@ dist/
 .venv/
 venv/
 .env
+debug-ui/data/
+debug-ui/.qa/

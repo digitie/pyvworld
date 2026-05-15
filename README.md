@@ -188,3 +188,18 @@ python -m mypy src/vworld
 ```
 
 자세한 테스트 기준은 [docs/testing.md](docs/testing.md)를 참고하세요.
+
+## 디버그 UI와 fixture replay
+
+`debug-ui/`에는 Streamlit 기반 디버깅 웹툴이 있습니다. 라이브 REST 호출을 실행해 Raw Response, Pydantic Model, Processed Result, Validation Errors를 나눠 보고, 의미 있는 케이스를 `tests/fixtures/{function}/{case}.json`으로 저장합니다.
+
+```bash
+pip install -e ".[dev]"
+cd debug-ui
+pip install -e .
+streamlit run app.py
+```
+
+저장된 fixture는 `tests/test_generated_fixtures.py`가 자동으로 읽어 replay 방식으로 검증하므로 기본 테스트는 네트워크를 호출하지 않습니다. 자세한 구조는 [docs/debug-ui.md](docs/debug-ui.md)를 참고하세요.
+
+Debug UI는 프로젝트 루트 `.env`의 `VWORLD_API_KEY`, `VWORLD_DOMAIN`을 기본값으로 읽습니다. 서비스키를 복사/붙여넣기하면서 들어간 공백과 줄바꿈은 클라이언트 생성 시 제거됩니다.

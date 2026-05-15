@@ -48,7 +48,7 @@ def test_search_requires_category_for_address_and_district(client):
 
 
 def test_search_more_helpers_and_validation(client, monkeypatch):
-    monkeypatch.setenv("VWORLD_API_KEY", "env-key")
+    monkeypatch.setenv("VWORLD_API_KEY", " env-\nkey\t")
     assert VworldClient.from_env().api_key == "env-key"
 
     with pytest.raises(VworldInvalidParameterError):
@@ -70,7 +70,7 @@ def test_search_more_helpers_and_validation(client, monkeypatch):
 def test_from_env_file_loads_key_and_domain(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text(
-        'VWORLD_API_KEY="file-key"\nVWORLD_DOMAIN=example.com\n# ignored\n',
+        'VWORLD_API_KEY=" file-\tkey "\nVWORLD_DOMAIN=example.com\n# ignored\n',
         encoding="utf-8",
     )
 
@@ -78,6 +78,18 @@ def test_from_env_file_loads_key_and_domain(tmp_path):
 
     assert client.api_key == "file-key"
     assert client.domain == "example.com"
+
+
+@responses.activate
+def test_pasted_api_key_whitespace_is_removed(ok_payload):
+    responses.add(responses.GET, BASE + "/req/search", json=ok_payload)
+
+    client = VworldClient(" test-\nkey\t", retry_backoff=0)
+    client.search_place("판교")
+
+    query = _query(responses.calls[0])
+    assert client.api_key == "test-key"
+    assert query["key"] == ["test-key"]
 
 
 def test_explicit_blank_domain_is_preserved(monkeypatch):

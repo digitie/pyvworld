@@ -26,6 +26,9 @@ Public wrappers accept the original string values and typed helpers. Enums cover
 - `iter_data_feature_pages` / `iter_data_feature_items` do the same for 2D Data `GetFeature`.
 - `response_page_info`, `has_next_page`, `next_page_no`, and `response_items` normalize the documented `response.record`, `response.page`, and `response.result.items` JSON structure.
 - `VworldResponseMetadata`, `sanitize_request_params`, `request_params_from_url`, `redact_credentials_in_text`, and `make_cache_key` are public utilities for logging/cache integrations without leaking `key=` query values or WMTS/TMS path keys.
+- `DebugRun`, `run_debug_function`, `debug_search`, `debug_geocode`, `debug_reverse_geocode`, and `debug_get_data_feature` expose Streamlit-independent debug runs for fixture generation.
+- `parse_*_response` and `process_*_response` provide the replay path used by `tests/test_generated_fixtures.py`.
+- `list_api_catalog`, `get_api_catalog_entry`, and `data_service_label` expose a small library-side catalog for the debug UI, including VWorld service key issuance links and human-readable 2D data service labels.
 
 ## Not Implemented
 

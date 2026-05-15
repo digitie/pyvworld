@@ -1,0 +1,136 @@
+{
+  "name": "search_pangyo_place",
+  "function": "search",
+  "description": "Search API replay runner 샘플 fixture",
+  "input": {
+    "query": "판교",
+    "type": "place",
+    "size": 10,
+    "page": 1
+  },
+  "request": {
+    "method": "GET",
+    "url": "https://api.vworld.kr/req/search?service=search&request=search&version=2.0&format=json&errorformat=json&query=%ED%8C%90%EA%B5%90&type=place&size=10&page=1&crs=EPSG%3A4326&key=<REDACTED>",
+    "endpoint": "/req/search",
+    "query": {
+      "service": "search",
+      "request": "search",
+      "version": "2.0",
+      "format": "json",
+      "errorformat": "json",
+      "query": "판교",
+      "type": "place",
+      "size": "10",
+      "page": "1",
+      "crs": "EPSG:4326"
+    },
+    "headers": {}
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "response": {
+        "status": "OK",
+        "record": {
+          "total": "2",
+          "current": "2"
+        },
+        "page": {
+          "total": "1",
+          "current": "1",
+          "size": "10"
+        },
+        "result": {
+          "items": [
+            {
+              "id": "POI-1",
+              "title": "판교역"
+            },
+            {
+              "id": "POI-2",
+              "title": "판교테크노밸리"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "parsed": {
+    "response": {
+      "status": "OK",
+      "record": {
+        "total": "2",
+        "current": "2"
+      },
+      "page": {
+        "total": "1",
+        "current": "1",
+        "size": "10"
+      },
+      "result": {
+        "items": [
+          {
+            "id": "POI-1",
+            "title": "판교역"
+          },
+          {
+            "id": "POI-2",
+            "title": "판교테크노밸리"
+          }
+        ]
+      }
+    }
+  },
+  "processed": {
+    "status": "OK",
+    "page": {
+      "total": "1",
+      "current": "1",
+      "size": "10"
+    },
+    "record": {
+      "total": "2",
+      "current": "2"
+    },
+    "items": [
+      {
+        "id": "POI-1",
+        "title": "판교역"
+      },
+      {
+        "id": "POI-2",
+        "title": "판교테크노밸리"
+      }
+    ],
+    "result": {
+      "items": [
+        {
+          "id": "POI-1",
+          "title": "판교역"
+        },
+        {
+          "id": "POI-2",
+          "title": "판교테크노밸리"
+        }
+      ]
+    },
+    "error": null
+  },
+  "assertion": {
+    "mode": "snapshot",
+    "exclude_fields": [
+      "fetched_at",
+      "request_id",
+      "updated_at"
+    ],
+    "required_fields": []
+  },
+  "meta": {
+    "created_at": "2026-05-15T00:00:00+09:00",
+    "library_version": "0.1.0",
+    "source": "debug_ui"
+  }
+}

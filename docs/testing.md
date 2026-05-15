@@ -21,6 +21,10 @@ python -m mypy src/vworld
 - Catalog tests assert the official 158-entry count and all entries being 2.0.
 - Pagination tests cover `response.page` traversal, item extraction, and loop guards.
 - Metadata tests cover credential sanitization for query `key=` and WMTS/TMS path keys.
+- Debug UI fixture tests cover sensitive value redaction and overwrite protection.
+- Generated fixture replay tests load `tests/fixtures/**/*.json`, parse the stored raw response, run the matching processor, and compare processed output without live network calls.
+- Catalog tests cover debug API catalog entries, service key issuance URL exposure, and human-readable data service labels.
+- REST client tests cover whitespace normalization for pasted VWorld service keys.
 
 ## Live Tests
 
@@ -32,6 +36,18 @@ Live tests should be opt-in only:
 - Prefer small requests such as one geocoder call or one tiny StaticMap.
 
 No live tests are currently required for the default validation path.
+
+## Fixture Replay
+
+Debug UI fixtures are stored under `tests/fixtures/{function}/{case}.json`. The common runner in `tests/test_generated_fixtures.py` maps each `function` to parser/processor callables in `tests/runners.py`.
+
+Supported assertion modes:
+
+- `snapshot`: compare processed output, excluding keys listed in `assertion.exclude_fields`.
+- `schema_only`: assert parsing and processing completed.
+- `required_fields`: assert dot-separated fields exist in processed output.
+
+Fixtures must not store VWorld API keys, Authorization headers, access tokens, refresh tokens, or tile path keys. The debug UI writer masks these values before writing JSON.
 
 ## Current Live Verification
 
