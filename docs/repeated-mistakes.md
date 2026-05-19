@@ -55,6 +55,10 @@ REST/OGC/Image 엔드포인트는 `key=` 쿼리 파라미터를 사용합니다.
 
 범례/StaticMap/WMS 이미지 요청에서 오류 응답이 이미지가 아니라 JSON/XML일 수 있습니다. `_http.py`는 바이너리 요청에서도 JSON 오류 payload를 검사합니다.
 
+## httpx 전환 후 requests 전용 mock을 쓰지 말 것
+
+HTTP 계층은 `httpx` 기반입니다. 기본 테스트에서 `responses`처럼 `requests` 전용 mock을 쓰면 실제 호출 경로를 검증하지 못합니다. 새 HTTP 테스트는 `tests/conftest.py`의 `HttpxMock` 헬퍼를 사용하고, 동기/비동기 클라이언트 모두 `_http.py`의 오류 매핑을 통과하게 만듭니다.
+
 ## StaticMap 크기와 줌
 
 StaticMap 문서 기준:

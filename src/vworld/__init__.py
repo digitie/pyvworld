@@ -14,7 +14,7 @@ from .catalog import (
     get_data_service,
     list_api_catalog,
 )
-from .client import VworldClient
+from .client import AsyncVworldClient, VworldClient
 from .debug import (
     DEBUG_FUNCTION_LABELS,
     DebugRun,
@@ -120,6 +120,7 @@ __all__ = [
     "StaticMapBase",
     "TextResponse",
     "TileLayer",
+    "AsyncVworldClient",
     "ProcessedVworldResponse",
     "VworldAuthError",
     "VworldClient",

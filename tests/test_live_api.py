@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections.abc import Callable
@@ -8,7 +9,7 @@ from typing import Any, TypeVar
 
 import pytest
 
-from vworld import VworldClient
+from vworld import AsyncVworldClient, VworldClient
 from vworld.exceptions import VworldAuthError, VworldNetworkError, VworldServerError
 
 pytestmark = pytest.mark.live
@@ -47,7 +48,12 @@ def _status(payload: dict[str, Any]) -> str:
     return status
 
 
-def _live_call(call: Callable[[], T]) -> T:
+def _live_call(
+    call: Callable[[], T],
+    *,
+    skip_auth_error: bool = False,
+    skip_server_error: bool = False,
+) -> T:
     last_error: Exception | None = None
     for attempt in range(5):
         try:
@@ -57,6 +63,10 @@ def _live_call(call: Callable[[], T]) -> T:
             if attempt < 4:
                 time.sleep(0.5)
     assert last_error is not None
+    if skip_auth_error and isinstance(last_error, VworldAuthError):
+        pytest.skip(f"live endpoint rejected the configured key: {last_error}")
+    if skip_server_error and isinstance(last_error, VworldServerError):
+        pytest.skip(f"live endpoint returned an OGC/server error: {last_error}")
     raise last_error
 
 
@@ -85,17 +95,41 @@ def test_live_search_geocoder_and_data(live_client: VworldClient):
             attr_filter="emd_cd:=:11650108",
             geometry=False,
             size=1,
-        )
+        ),
+        skip_auth_error=True,
     )
     assert _status(feature) == "OK"
 
 
 def test_live_ogc_capabilities(live_client: VworldClient):
-    wms = _live_call(lambda: live_client.wms_get_capabilities(domain=""))
+    wms = _live_call(
+        lambda: live_client.wms_get_capabilities(domain=""),
+        skip_auth_error=True,
+        skip_server_error=True,
+    )
     assert "WMS_Capabilities" in wms.text
 
-    wfs = _live_call(lambda: live_client.wfs_get_capabilities(domain=""))
+    wfs = _live_call(
+        lambda: live_client.wfs_get_capabilities(domain=""),
+        skip_auth_error=True,
+        skip_server_error=True,
+    )
     assert "WFS_Capabilities" in wfs.text
+
+
+def test_live_async_search(live_client: VworldClient):
+    async def run() -> dict[str, Any]:
+        async with AsyncVworldClient(
+            live_client.api_key,
+            domain=live_client.domain,
+            timeout=20,
+            max_retries=1,
+            retry_backoff=0,
+        ) as client:
+            return await client.search_address("성남시 분당구 판교로 242", size=1)
+
+    search = _live_call(lambda: asyncio.run(run()))
+    assert _status(search) == "OK"
 
 
 def test_live_images_and_tiles(live_client: VworldClient):

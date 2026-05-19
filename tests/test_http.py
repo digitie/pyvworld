@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-import responses
 
 from vworld._http import _VworldHttp
 from vworld.exceptions import (
@@ -15,26 +14,24 @@ from vworld.exceptions import (
 BASE = "https://api.vworld.kr"
 
 
-@responses.activate
-def test_json_ok_adds_key_and_returns_payload(ok_payload):
-    responses.add(responses.GET, BASE + "/req/search", json=ok_payload)
+def test_json_ok_adds_key_and_returns_payload(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
 
     data = _VworldHttp("test-key", retry_backoff=0).get_json("/req/search", {"service": "search"})
 
     assert data == ok_payload
-    assert "key=test-key" in responses.calls[0].request.url
-    assert "service=search" in responses.calls[0].request.url
+    assert "key=test-key" in str(http_mock.calls[0].request.url)
+    assert "service=search" in str(http_mock.calls[0].request.url)
 
 
-@responses.activate
-def test_json_parse_and_shape_errors():
-    responses.add(
-        responses.GET,
+def test_json_parse_and_shape_errors(http_mock):
+    http_mock.add(
+        "GET",
         BASE + "/bad-json",
         body="not-json",
         content_type="application/json",
     )
-    responses.add(responses.GET, BASE + "/list-json", json=[])
+    http_mock.add("GET", BASE + "/list-json", json=[])
 
     http = _VworldHttp("test-key", retry_backoff=0)
     with pytest.raises(VworldServerError):
@@ -54,10 +51,9 @@ def test_json_parse_and_shape_errors():
         ("PARAM_REQUIRED", VworldServerError),
     ],
 )
-@responses.activate
-def test_vworld_error_code_mapping(code, exc_type):
-    responses.add(
-        responses.GET,
+def test_vworld_error_code_mapping(code, exc_type, http_mock):
+    http_mock.add(
+        "GET",
         BASE + "/req/search",
         json={"response": {"status": "ERROR", "error": {"code": code, "text": "boom"}}},
     )
@@ -66,18 +62,16 @@ def test_vworld_error_code_mapping(code, exc_type):
         _VworldHttp("test-key", retry_backoff=0).get_json("/req/search")
 
 
-@responses.activate
-def test_not_found_maps_to_no_data():
-    responses.add(responses.GET, BASE + "/req/search", json={"response": {"status": "NOT_FOUND"}})
+def test_not_found_maps_to_no_data(http_mock):
+    http_mock.add("GET", BASE + "/req/search", json={"response": {"status": "NOT_FOUND"}})
 
     with pytest.raises(VworldNoDataError):
         _VworldHttp("test-key", retry_backoff=0).get_json("/req/search")
 
 
-@responses.activate
-def test_binary_json_error_payload_is_mapped():
-    responses.add(
-        responses.GET,
+def test_binary_json_error_payload_is_mapped(http_mock):
+    http_mock.add(
+        "GET",
         BASE + "/req/image",
         json={"response": {"status": "ERROR", "error": {"code": "INVALID_KEY", "text": "bad"}}},
         content_type="application/json",
@@ -87,10 +81,9 @@ def test_binary_json_error_payload_is_mapped():
         _VworldHttp("test-key", retry_backoff=0).get_bytes("/req/image")
 
 
-@responses.activate
-def test_binary_invalid_json_content_type_is_ignored():
-    responses.add(
-        responses.GET,
+def test_binary_invalid_json_content_type_is_ignored(http_mock):
+    http_mock.add(
+        "GET",
         BASE + "/req/image",
         body=b"not-json",
         content_type="application/json",
@@ -101,10 +94,9 @@ def test_binary_invalid_json_content_type_is_ignored():
     assert content == b"not-json"
 
 
-@responses.activate
-def test_xml_exception_payload_is_server_error():
-    responses.add(
-        responses.GET,
+def test_xml_exception_payload_is_server_error(http_mock):
+    http_mock.add(
+        "GET",
         BASE + "/req/wmts/1.0.0/test-key/Base/1/2/3.png",
         body="<ExceptionReport/>",
         content_type="text/xml",
@@ -117,23 +109,22 @@ def test_xml_exception_payload_is_server_error():
         )
 
 
-@responses.activate
-def test_retries_5xx_then_succeeds(ok_payload):
-    responses.add(responses.GET, BASE + "/req/search", status=503)
-    responses.add(responses.GET, BASE + "/req/search", json=ok_payload)
+def test_retries_5xx_then_succeeds(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", status=503)
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
 
     data = _VworldHttp("test-key", retry_backoff=0, max_retries=1).get_json("/req/search")
 
     assert data["response"]["status"] == "OK"
-    assert len(responses.calls) == 2
+    assert len(http_mock.calls) == 2
 
 
 def test_network_timeout_maps_to_network_error(monkeypatch):
-    import requests
+    import httpx
 
     class BadSession:
         def get(self, *args, **kwargs):
-            raise requests.Timeout("too slow")
+            raise httpx.TimeoutException("too slow")
 
     with pytest.raises(VworldNetworkError):
         _VworldHttp("test-key", retry_backoff=0, max_retries=0, session=BadSession()).get_json(
@@ -150,19 +141,17 @@ def test_network_timeout_maps_to_network_error(monkeypatch):
         (404, VworldServerError),
     ],
 )
-@responses.activate
-def test_http_status_mapping(status, exc_type):
-    responses.add(responses.GET, BASE + "/req/search", status=status, body="status error")
+def test_http_status_mapping(status, exc_type, http_mock):
+    http_mock.add("GET", BASE + "/req/search", status=status, body="status error")
 
     with pytest.raises(exc_type):
-        _VworldHttp("test-key", retry_backoff=0).get_json("/req/search")
+        _VworldHttp("test-key", retry_backoff=0, max_retries=0).get_json("/req/search")
 
 
-@responses.activate
-def test_non_error_or_non_dict_error_envelopes_return_or_raise():
-    responses.add(responses.GET, BASE + "/unknown-status", json={"response": {"status": "PENDING"}})
-    responses.add(
-        responses.GET,
+def test_non_error_or_non_dict_error_envelopes_return_or_raise(http_mock):
+    http_mock.add("GET", BASE + "/unknown-status", json={"response": {"status": "PENDING"}})
+    http_mock.add(
+        "GET",
         BASE + "/string-error",
         json={"response": {"status": "ERROR", "error": "plain"}},
     )

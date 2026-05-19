@@ -67,7 +67,7 @@ class _RecordedCall:
 
 
 class _RecordingSession:
-    """기존 requests session을 감싸 요청과 응답을 저장합니다."""
+    """기존 httpx client/session을 감싸 요청과 응답을 저장합니다."""
 
     def __init__(self, session: Any) -> None:
         self._session = session

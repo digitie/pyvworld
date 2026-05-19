@@ -1,6 +1,6 @@
 # Testing
 
-The default test suite must not call the live VWorld service. Use `responses` for HTTP tests and exact URL/query assertions.
+The default test suite must not call the live VWorld service. Use the local `httpx.MockTransport` helper in `tests/conftest.py` for HTTP tests and exact URL/query assertions.
 
 ## Required Checks
 
@@ -15,6 +15,7 @@ python -m mypy src/vworld
 
 - Parameter tests cover bool conversion, CSV joining, bbox/point formatting, and invalid sizes.
 - HTTP tests cover key injection, JSON parsing, VWorld error code mapping, `NOT_FOUND`, binary JSON error payloads, retries, and network timeouts.
+- Async client tests cover `AsyncVworldClient`, the `VworldClient.aio()` factory, and blank-domain preservation.
 - REST client tests assert `version=2.0` and endpoint-specific required params.
 - OGC tests assert WMS/WFS uppercase parameter names and response wrappers.
 - Image/tile tests assert StaticMap, legend, WMTS, and TMS URL shapes.
@@ -34,6 +35,7 @@ Live tests should be opt-in only:
 - Skip unless `VWORLD_API_KEY` is present.
 - Do not store raw responses containing private keys or query URLs with keys.
 - Prefer small requests such as one geocoder call or one tiny StaticMap.
+- Endpoint-specific VWorld key/domain rejection may be skipped for live-only smoke tests, but Search/Geocoder and async Search should still pass with a usable key.
 
 No live tests are currently required for the default validation path.
 

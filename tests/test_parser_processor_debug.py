@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-import responses
-
 from vworld import VworldClient
 from vworld.debug import debug_get_data_feature, debug_search
 from vworld.parser import parse_search_response
@@ -30,10 +28,9 @@ def test_parser_and_processor_normalize_items() -> None:
     assert processed.status == "OK"
 
 
-@responses.activate
-def test_debug_search_captures_request_response_and_processed_result() -> None:
-    responses.add(
-        responses.GET,
+def test_debug_search_captures_request_response_and_processed_result(http_mock) -> None:
+    http_mock.add(
+        "GET",
         BASE + "/req/search",
         json={
             "response": {
@@ -50,7 +47,7 @@ def test_debug_search_captures_request_response_and_processed_result() -> None:
         {"query": "판교", "type": "place", "size": 10, "page": 1},
     )
 
-    query = parse_qs(urlparse(responses.calls[0].request.url).query)
+    query = parse_qs(urlparse(str(http_mock.calls[0].request.url)).query)
     assert query["key"] == ["secret-key"]
     assert "secret-key" not in run.request["url"]
     assert "key" not in run.request["query"]
@@ -62,10 +59,9 @@ def test_debug_search_captures_request_response_and_processed_result() -> None:
     assert run.error is None
 
 
-@responses.activate
-def test_debug_data_feature_includes_dataset_catalog_item() -> None:
-    responses.add(
-        responses.GET,
+def test_debug_data_feature_includes_dataset_catalog_item(http_mock) -> None:
+    http_mock.add(
+        "GET",
         BASE + "/req/data",
         json={
             "response": {
@@ -98,10 +94,9 @@ def test_debug_search_returns_error_when_auth_is_missing(monkeypatch) -> None:
     assert run.response == {}
 
 
-@responses.activate
-def test_debug_search_keeps_vworld_error_body_for_fixture_review() -> None:
-    responses.add(
-        responses.GET,
+def test_debug_search_keeps_vworld_error_body_for_fixture_review(http_mock) -> None:
+    http_mock.add(
+        "GET",
         BASE + "/req/search",
         json={
             "response": {

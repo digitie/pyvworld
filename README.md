@@ -12,6 +12,7 @@ VWorld(브이월드) HTTP API를 Python에서 쓰기 쉽게 감싼 비공식 클
 - WMS/WFS API 2.0 레퍼런스: `GetCapabilities`, `GetMap`, `GetFeatureInfo`, `DescribeFeatureType`, `GetFeature`
 - 범례이미지/StaticMap API 2.0: 이미지 바이트 응답과 URL 빌더
 - WMTS/TMS: 타일, 해외위성영상 테마 타일, capabilities/resource URL
+- `httpx` 기반 동기 클라이언트와 `asyncio`용 `AsyncVworldClient`
 - 페이지 반복/아이템 추출 헬퍼와 인증키를 제거한 메타데이터/캐시 키 유틸
 - 네트워크 없이 검증되는 fixture/mock 기반 테스트
 
@@ -60,6 +61,22 @@ print(coord["response"]["result"]["point"])
 
 reverse = client.reverse_geocode((127.101313354, 37.402352535), type="both")
 print(reverse["response"]["result"])
+```
+
+비동기 코드에서는 같은 REST 파라미터 계약을 `AsyncVworldClient`로 사용할 수 있습니다.
+
+```python
+import asyncio
+from vworld import AsyncVworldClient
+
+
+async def main() -> None:
+    async with AsyncVworldClient.from_env_file() as client:
+        result = await client.search_address("성남시 분당구 판교로 242", size=1)
+        print(result["response"]["result"]["items"])
+
+
+asyncio.run(main())
 ```
 
 로컬 `.env` 파일에서 바로 읽을 수도 있습니다. `.env`는 `.gitignore`에 포함되어 커밋되지 않습니다.

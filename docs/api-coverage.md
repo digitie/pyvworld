@@ -20,6 +20,10 @@
 
 Public wrappers accept the original string values and typed helpers. Enums cover common documented parameter sets such as search/address categories, CRS, legend type, image format, StaticMap basemap, and tile layers. `LatLon`, `LonLat`, `BBox`, `BinaryResponse`, and `TextResponse` are frozen Pydantic v2 models, so external programs can use `model_validate()`, `model_dump()`, and JSON schema generation without changing existing tuple inputs.
 
+## HTTP Runtime
+
+The transport layer uses `httpx`. `VworldClient` keeps the existing synchronous API surface, and `AsyncVworldClient` exposes asyncio-friendly calls for REST, OGC text/binary responses, image responses, and tile fetch helpers. Both clients share the same `_http.py` status and VWorld body error mapping.
+
 ## General-Purpose Helpers
 
 - `iter_search_pages` / `iter_search_items` follow Search API `response.page` metadata while preserving the base `search` parameter validation.

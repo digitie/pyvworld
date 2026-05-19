@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, TypeAlias
 from urllib.parse import quote
 
-from ._http import _VworldHttp
+from ._http import _AsyncVworldHttp, _VworldHttp
 from ._params import (
     bbox as bbox_param,
 )
@@ -148,6 +148,12 @@ class VworldClient:
         return cls(**kwargs)
 
     @classmethod
+    def aio(cls, **kwargs: Any) -> AsyncVworldClient:
+        """Create an asyncio/httpx based VWorld client."""
+
+        return AsyncVworldClient(**kwargs)
+
+    @classmethod
     def from_env_file(
         cls,
         path: str | os.PathLike[str] = ".env",
@@ -168,6 +174,18 @@ class VworldClient:
         if self._http is None:
             raise VworldAuthError("VWORLD_API_KEY is not set and api_key was not provided")
         return self._http
+
+    def close(self) -> None:
+        """Close the underlying sync httpx client."""
+
+        if self._http is not None:
+            self._http.close()
+
+    def __enter__(self) -> VworldClient:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
     def _with_domain(self, params: JsonObject, domain: str | None = None) -> JsonObject:
         if domain is not None:
@@ -1081,6 +1099,849 @@ class VworldClient:
             raise VworldInvalidParameterError("theme tile_type must be png, jpeg, or jpg")
 
     # Debug/advanced escape hatch
+    def build_rest_url(self, path: str, params: dict[str, Any] | None = None) -> str:
+        """Build an authenticated URL for an advanced VWorld REST request."""
+
+        return self._require_http().build_url(path, clean_params(params or {}))
+
+
+class AsyncVworldClient:
+    """Asyncio/httpx client entrypoint for VWorld REST endpoints."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        *,
+        domain: str | None = None,
+        timeout: float = 10.0,
+        max_retries: int = 2,
+        retry_backoff: float = 0.5,
+        session: Any | None = None,
+    ) -> None:
+        self.api_key = (
+            _normalize_api_key(api_key)
+            or _normalize_api_key(os.getenv("VWORLD_API_KEY"))
+            or _normalize_api_key(os.getenv("VWORLD_KEY"))
+        )
+        self.domain = domain if domain is not None else os.getenv("VWORLD_DOMAIN")
+        self.timeout = timeout
+        self._http = (
+            _AsyncVworldHttp(
+                self.api_key,
+                timeout=timeout,
+                max_retries=max_retries,
+                retry_backoff=retry_backoff,
+                session=session,
+            )
+            if self.api_key
+            else None
+        )
+
+    @classmethod
+    def from_env(cls, **kwargs: Any) -> AsyncVworldClient:
+        """Create an async client from ``VWORLD_API_KEY`` or ``VWORLD_KEY``."""
+
+        return cls(**kwargs)
+
+    @classmethod
+    def from_env_file(
+        cls,
+        path: str | os.PathLike[str] = ".env",
+        **kwargs: Any,
+    ) -> AsyncVworldClient:
+        """Create an async client from a local dotenv-style file."""
+
+        values = _read_env_file(path)
+        api_key = (
+            kwargs.pop("api_key")
+            if "api_key" in kwargs
+            else values.get("VWORLD_API_KEY") or values.get("VWORLD_KEY")
+        )
+        domain = kwargs.pop("domain") if "domain" in kwargs else values.get("VWORLD_DOMAIN")
+        return cls(api_key=api_key, domain=domain, **kwargs)
+
+    async def __aenter__(self) -> AsyncVworldClient:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the underlying async httpx client."""
+
+        if self._http is not None:
+            await self._http.aclose()
+
+    def _require_http(self) -> _AsyncVworldHttp:
+        if self._http is None:
+            raise VworldAuthError("VWORLD_API_KEY is not set and api_key was not provided")
+        return self._http
+
+    def _with_domain(self, params: JsonObject, domain: str | None = None) -> JsonObject:
+        if domain is not None:
+            params["domain"] = domain
+        elif self.domain:
+            params["domain"] = self.domain
+        return params
+
+    async def search(
+        self,
+        query: str,
+        type: str | SearchType,
+        *,
+        category: SearchCategory | None = None,
+        size: int = 10,
+        page: int = 1,
+        bbox: BBoxLike | None = None,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+    ) -> JsonObject:
+        """Call Search API 2.0 (``/req/search``) asynchronously."""
+
+        if not query:
+            raise VworldInvalidParameterError("query must not be empty")
+        normalized_type = _text_value(type).lower()
+        if normalized_type not in {"place", "address", "district", "road"}:
+            raise VworldInvalidParameterError("type must be place, address, district, or road")
+        if normalized_type in {"address", "district"} and category is None:
+            raise VworldInvalidParameterError(
+                "category is required for address and district search"
+            )
+        validate_page_size(size)
+        validate_page(page)
+
+        params = {
+            "service": "search",
+            "request": "search",
+            "version": _REST_VERSION,
+            "format": _DEFAULT_FORMAT,
+            "errorformat": _DEFAULT_ERROR_FORMAT,
+            "query": query,
+            "type": normalized_type,
+            "category": csv(category),
+            "size": size,
+            "page": page,
+            "bbox": bbox_param(bbox),
+            "crs": crs,
+            "callback": callback,
+        }
+        return await self._require_http().get_json("/req/search", params)
+
+    async def search_place(self, query: str, **kwargs: Any) -> JsonObject:
+        """Search places such as buildings, facilities, agencies, and stores."""
+
+        return await self.search(query, "place", **kwargs)
+
+    async def search_address(
+        self,
+        query: str,
+        *,
+        category: str | AddressCategory = AddressCategory.ROAD,
+        **kwargs: Any,
+    ) -> JsonObject:
+        """Search road or parcel addresses asynchronously."""
+
+        return await self.search(query, "address", category=category, **kwargs)
+
+    async def search_district(
+        self,
+        query: str,
+        *,
+        category: str | DistrictCategory = DistrictCategory.LEVEL4,
+        **kwargs: Any,
+    ) -> JsonObject:
+        """Search administrative districts asynchronously."""
+
+        return await self.search(query, "district", category=category, **kwargs)
+
+    async def search_road(self, query: str, **kwargs: Any) -> JsonObject:
+        """Search road names asynchronously."""
+
+        return await self.search(query, "road", **kwargs)
+
+    async def get_coord(
+        self,
+        address: str,
+        type: str | AddressType,
+        *,
+        refine: bool = True,
+        simple: bool = False,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+    ) -> JsonObject:
+        """Convert an address to coordinates via Geocoder API 2.0 asynchronously."""
+
+        if not address:
+            raise VworldInvalidParameterError("address must not be empty")
+        normalized_type = _text_value(type).lower()
+        if normalized_type not in {"road", "parcel"}:
+            raise VworldInvalidParameterError("type must be road or parcel")
+        params = {
+            "service": "address",
+            "request": "getcoord",
+            "version": _REST_VERSION,
+            "format": _DEFAULT_FORMAT,
+            "errorformat": _DEFAULT_ERROR_FORMAT,
+            "type": normalized_type,
+            "address": address,
+            "refine": refine,
+            "simple": simple,
+            "crs": crs,
+            "callback": callback,
+        }
+        return await self._require_http().get_json("/req/address", params)
+
+    async def geocode(
+        self,
+        address: str,
+        type: str | AddressType = AddressType.ROAD,
+        **kwargs: Any,
+    ) -> JsonObject:
+        """Alias for :meth:`get_coord`."""
+
+        return await self.get_coord(address, type, **kwargs)
+
+    async def get_address(
+        self,
+        point_value: PointLike,
+        *,
+        type: str | ReverseGeocodeType = ReverseGeocodeType.BOTH,
+        zipcode: bool = True,
+        simple: bool = False,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+    ) -> JsonObject:
+        """Convert coordinates to road and/or parcel addresses asynchronously."""
+
+        normalized_type = _text_value(type).lower()
+        if normalized_type not in {"road", "parcel", "both"}:
+            raise VworldInvalidParameterError("type must be road, parcel, or both")
+        params = {
+            "service": "address",
+            "request": "getaddress",
+            "version": _REST_VERSION,
+            "format": _DEFAULT_FORMAT,
+            "errorformat": _DEFAULT_ERROR_FORMAT,
+            "point": point(point_value),
+            "type": normalized_type,
+            "zipcode": zipcode,
+            "simple": simple,
+            "crs": crs,
+            "callback": callback,
+        }
+        return await self._require_http().get_json("/req/address", params)
+
+    async def reverse_geocode(self, point_value: PointLike, **kwargs: Any) -> JsonObject:
+        """Alias for :meth:`get_address`."""
+
+        return await self.get_address(point_value, **kwargs)
+
+    async def reverse_geocode_latlon(self, lat: float, lon: float, **kwargs: Any) -> JsonObject:
+        """Reverse geocode a WGS84 latitude/longitude point asynchronously."""
+
+        return await self.get_address(LatLon(lat=lat, lon=lon), **kwargs)
+
+    async def get_data_feature(
+        self,
+        data: str,
+        *,
+        geom_filter: str | None = None,
+        attr_filter: StringList | None = None,
+        columns: StringList | None = None,
+        geometry: bool = True,
+        attribute: bool = True,
+        buffer: int | float | None = None,
+        size: int = 10,
+        page: int = 1,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+        domain: str | None = None,
+    ) -> JsonObject:
+        """Query 2D Data API 2.0 features asynchronously."""
+
+        if not data:
+            raise VworldInvalidParameterError("data must not be empty")
+        validate_page_size(size)
+        validate_page(page)
+        params = self._with_domain(
+            {
+                "service": "data",
+                "request": "GetFeature",
+                "version": _REST_VERSION,
+                "format": _DEFAULT_FORMAT,
+                "errorformat": _DEFAULT_ERROR_FORMAT,
+                "data": data,
+                "geomFilter": geom_filter,
+                "attrFilter": _attr_filter(attr_filter),
+                "columns": csv(columns),
+                "geometry": geometry,
+                "attribute": attribute,
+                "buffer": buffer,
+                "size": size,
+                "page": page,
+                "crs": crs,
+                "callback": callback,
+            },
+            domain,
+        )
+        return await self._require_http().get_json("/req/data", params)
+
+    async def get_data_feature_type(
+        self,
+        data: str,
+        *,
+        crs: str | Crs = _DEFAULT_CRS,
+        callback: str | None = None,
+        domain: str | None = None,
+    ) -> JsonObject:
+        """Call the documented ``GetFeatureType`` operation asynchronously."""
+
+        if not data:
+            raise VworldInvalidParameterError("data must not be empty")
+        params = self._with_domain(
+            {
+                "service": "data",
+                "request": "GetFeatureType",
+                "version": _REST_VERSION,
+                "format": _DEFAULT_FORMAT,
+                "errorformat": _DEFAULT_ERROR_FORMAT,
+                "data": data,
+                "crs": crs,
+                "callback": callback,
+            },
+            domain,
+        )
+        return await self._require_http().get_json("/req/data", params)
+
+    async def wms_get_capabilities(
+        self,
+        *,
+        version: str = "1.3.0",
+        exceptions: str = "text/xml",
+        domain: str | None = None,
+    ) -> TextResponse:
+        """Call WMS ``GetCapabilities`` asynchronously."""
+
+        params = self._with_domain(
+            {
+                "SERVICE": "WMS",
+                "REQUEST": "GetCapabilities",
+                "VERSION": version,
+                "EXCEPTIONS": exceptions,
+            },
+            domain,
+        )
+        text, content_type = await self._require_http().get_text("/req/wms", params)
+        return TextResponse(text=text, content_type=content_type)
+
+    def wms_get_map_url(self, **kwargs: Any) -> str:
+        """Build a WMS ``GetMap`` URL without fetching it."""
+
+        return self._require_http().build_url("/req/wms", self._wms_get_map_params(**kwargs))
+
+    async def wms_get_map(self, **kwargs: Any) -> BinaryResponse:
+        """Call WMS ``GetMap`` asynchronously and return map image bytes."""
+
+        content, content_type = await self._require_http().get_bytes(
+            "/req/wms",
+            self._wms_get_map_params(**kwargs),
+        )
+        return BinaryResponse(content=content, content_type=content_type)
+
+    def _wms_get_map_params(
+        self,
+        *,
+        layers: str | list[str] | tuple[str, ...],
+        bbox: BBoxLike,
+        width: int,
+        height: int,
+        styles: str | list[str] | tuple[str, ...] | None = None,
+        crs: str | Crs = _DEFAULT_OGC_CRS,
+        format: str = "image/png",
+        transparent: bool = False,
+        bgcolor: str = "0xFFFFFF",
+        exceptions: str = "text/xml",
+        version: str = "1.3.0",
+        domain: str | None = None,
+    ) -> JsonObject:
+        if width <= 0 or height <= 0:
+            raise VworldInvalidParameterError("width and height must be positive")
+        return self._with_domain(
+            {
+                "SERVICE": "WMS",
+                "REQUEST": "GetMap",
+                "VERSION": version,
+                "LAYERS": csv(layers),
+                "STYLES": csv(styles),
+                "CRS": crs,
+                "BBOX": bbox_param(bbox),
+                "WIDTH": width,
+                "HEIGHT": height,
+                "FORMAT": format,
+                "TRANSPARENT": transparent,
+                "BGCOLOR": bgcolor,
+                "EXCEPTIONS": exceptions,
+            },
+            domain,
+        )
+
+    async def wms_get_feature_info(
+        self,
+        *,
+        layers: str | list[str] | tuple[str, ...],
+        query_layers: str | list[str] | tuple[str, ...],
+        bbox: BBoxLike,
+        width: int,
+        height: int,
+        i: int,
+        j: int,
+        styles: str | list[str] | tuple[str, ...] | None = None,
+        crs: str | Crs = _DEFAULT_OGC_CRS,
+        info_format: str = "text/xml",
+        feature_count: int | None = None,
+        version: str = "1.3.0",
+        domain: str | None = None,
+    ) -> TextResponse:
+        """Call WMS ``GetFeatureInfo`` asynchronously."""
+
+        if width <= 0 or height <= 0:
+            raise VworldInvalidParameterError("width and height must be positive")
+        if i < 0 or j < 0:
+            raise VworldInvalidParameterError("i and j must be non-negative")
+        params = self._with_domain(
+            {
+                "SERVICE": "WMS",
+                "REQUEST": "GetFeatureInfo",
+                "VERSION": version,
+                "LAYERS": csv(layers),
+                "QUERY_LAYERS": csv(query_layers),
+                "STYLES": csv(styles),
+                "CRS": crs,
+                "BBOX": bbox_param(bbox),
+                "WIDTH": width,
+                "HEIGHT": height,
+                "I": i,
+                "J": j,
+                "INFO_FORMAT": info_format,
+                "FEATURE_COUNT": feature_count,
+            },
+            domain,
+        )
+        text, content_type = await self._require_http().get_text("/req/wms", params)
+        return TextResponse(text=text, content_type=content_type)
+
+    async def wfs_get_capabilities(
+        self,
+        *,
+        version: str = "1.1.0",
+        exceptions: str = "text/xml",
+        domain: str | None = None,
+    ) -> TextResponse:
+        """Call WFS ``GetCapabilities`` asynchronously."""
+
+        params = self._with_domain(
+            {
+                "SERVICE": "WFS",
+                "REQUEST": "GetCapabilities",
+                "VERSION": version,
+                "EXCEPTIONS": exceptions,
+            },
+            domain,
+        )
+        text, content_type = await self._require_http().get_text("/req/wfs", params)
+        return TextResponse(text=text, content_type=content_type)
+
+    async def wfs_describe_feature_type(
+        self,
+        type_name: str | list[str] | tuple[str, ...],
+        *,
+        version: str = "1.1.0",
+        output_format: str | None = None,
+        domain: str | None = None,
+    ) -> TextResponse:
+        """Call WFS ``DescribeFeatureType`` asynchronously."""
+
+        params = self._with_domain(
+            {
+                "SERVICE": "WFS",
+                "REQUEST": "DescribeFeatureType",
+                "VERSION": version,
+                "TYPENAME": csv(type_name),
+                "OUTPUTFORMAT": output_format,
+            },
+            domain,
+        )
+        text, content_type = await self._require_http().get_text("/req/wfs", params)
+        return TextResponse(text=text, content_type=content_type)
+
+    async def wfs_get_feature(
+        self,
+        type_name: str | list[str] | tuple[str, ...],
+        *,
+        bbox: BBoxLike | None = None,
+        property_name: str | list[str] | tuple[str, ...] | None = None,
+        max_features: int | None = None,
+        srs_name: str | Crs = _DEFAULT_OGC_CRS,
+        output: str = "GML2",
+        exceptions: str = "text/xml",
+        filter: str | None = None,
+        version: str = "1.1.0",
+        domain: str | None = None,
+    ) -> TextResponse:
+        """Call WFS ``GetFeature`` asynchronously."""
+
+        if max_features is not None and max_features < 1:
+            raise VworldInvalidParameterError("max_features must be at least 1")
+        params = self._with_domain(
+            {
+                "SERVICE": "WFS",
+                "REQUEST": "GetFeature",
+                "VERSION": version,
+                "TYPENAME": csv(type_name),
+                "BBOX": bbox_param(bbox),
+                "PROPERTYNAME": csv(property_name),
+                "MAXFEATURES": max_features,
+                "SRSNAME": srs_name,
+                "OUTPUT": output,
+                "EXCEPTIONS": exceptions,
+                "FILTER": filter,
+            },
+            domain,
+        )
+        text, content_type = await self._require_http().get_text("/req/wfs", params)
+        return TextResponse(text=text, content_type=content_type)
+
+    async def get_legend_graphic(
+        self,
+        layer: str,
+        *,
+        style: str | None = None,
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
+    ) -> BinaryResponse:
+        """Call Image API ``GetLegendGraphic`` asynchronously."""
+
+        return await self._image_legend(
+            "GetLegendGraphic",
+            layer,
+            style=style,
+            type=type,
+            format=format,
+        )
+
+    async def get_legend_style(
+        self,
+        layer: str,
+        *,
+        style: str | None = None,
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
+    ) -> BinaryResponse:
+        """Call Image API ``GetLegendStyle`` asynchronously."""
+
+        return await self._image_legend(
+            "GetLegendStyle",
+            layer,
+            style=style,
+            type=type,
+            format=format,
+        )
+
+    def legend_graphic_url(self, layer: str, **kwargs: Any) -> str:
+        """Build a ``GetLegendGraphic`` URL without fetching it."""
+
+        return self._require_http().build_url(
+            "/req/image",
+            self._legend_params("GetLegendGraphic", layer, **kwargs),
+        )
+
+    def legend_style_url(self, layer: str, **kwargs: Any) -> str:
+        """Build a ``GetLegendStyle`` URL without fetching it."""
+
+        return self._require_http().build_url(
+            "/req/image",
+            self._legend_params("GetLegendStyle", layer, **kwargs),
+        )
+
+    async def _image_legend(self, request: str, layer: str, **kwargs: Any) -> BinaryResponse:
+        content, content_type = await self._require_http().get_bytes(
+            "/req/image",
+            self._legend_params(request, layer, **kwargs),
+        )
+        return BinaryResponse(content=content, content_type=content_type)
+
+    def _legend_params(
+        self,
+        request: str,
+        layer: str,
+        *,
+        style: str | None = None,
+        type: str | LegendType = LegendType.ALL,
+        format: str | ImageFormat = ImageFormat.PNG,
+    ) -> JsonObject:
+        if not layer:
+            raise VworldInvalidParameterError("layer must not be empty")
+        type_value = _text_value(type).upper()
+        if type_value not in {"ALL", "LAYER", "SUB"}:
+            raise VworldInvalidParameterError("type must be ALL, LAYER, or SUB")
+        return {
+            "service": "image",
+            "request": request,
+            "version": _REST_VERSION,
+            "format": format,
+            "errorformat": _DEFAULT_ERROR_FORMAT,
+            "layer": layer,
+            "style": style,
+            "type": type_value,
+        }
+
+    def static_map_url(self, **kwargs: Any) -> str:
+        """Build a StaticMap ``GetMap`` URL without fetching it."""
+
+        return self._require_http().build_url("/req/image", self._static_map_params(**kwargs))
+
+    async def static_map(self, **kwargs: Any) -> BinaryResponse:
+        """Call StaticMap API 2.0 asynchronously and return image bytes."""
+
+        content, content_type = await self._require_http().get_bytes(
+            "/req/image",
+            self._static_map_params(**kwargs),
+        )
+        return BinaryResponse(content=content, content_type=content_type)
+
+    def _static_map_params(
+        self,
+        *,
+        center: PointLike,
+        zoom: int,
+        size: str | tuple[int, int],
+        basemap: str | StaticMapBase = StaticMapBase.GRAPHIC,
+        crs: str | Crs = _DEFAULT_CRS,
+        format: str | ImageFormat = ImageFormat.PNG,
+        layers: str | list[str] | tuple[str, ...] | None = None,
+        styles: str | list[str] | tuple[str, ...] | None = None,
+        marker: str | list[str] | tuple[str, ...] | None = None,
+        route: str | list[str] | tuple[str, ...] | None = None,
+    ) -> JsonObject:
+        validate_zoom(zoom)
+        validate_static_size(size)
+        return {
+            "service": "image",
+            "request": "getmap",
+            "version": _REST_VERSION,
+            "format": format,
+            "errorformat": _DEFAULT_ERROR_FORMAT,
+            "basemap": basemap,
+            "center": point(center),
+            "crs": crs,
+            "zoom": zoom,
+            "size": pixel_size(size),
+            "layers": csv(layers),
+            "styles": csv(styles),
+            "marker": marker,
+            "route": route,
+        }
+
+    async def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
+        """Call StaticMap with a WGS84 latitude/longitude center asynchronously."""
+
+        return await self.static_map(center=LatLon(lat=lat, lon=lon), **kwargs)
+
+    def static_map_latlon_url(self, lat: float, lon: float, **kwargs: Any) -> str:
+        """Build a StaticMap URL with a WGS84 latitude/longitude center."""
+
+        return self.static_map_url(center=LatLon(lat=lat, lon=lon), **kwargs)
+
+    def wmts_tile_url(
+        self,
+        layer: str | TileLayer,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        *,
+        tile_type: str | None = None,
+    ) -> str:
+        """Build a WMTS GetTile URL."""
+
+        layer_text = self._normalize_tile_layer(layer)
+        ext = tile_type or _TILE_EXTENSIONS[layer_text]
+        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        return self._tile_url(
+            "wmts",
+            (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
+        )
+
+    async def get_wmts_tile(self, *args: Any, **kwargs: Any) -> BinaryResponse:
+        """Fetch a WMTS tile asynchronously."""
+
+        return await self._fetch_absolute(self.wmts_tile_url(*args, **kwargs))
+
+    def wmts_theme_tile_url(
+        self,
+        category: str,
+        year: int | str,
+        city: str,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        *,
+        tile_type: str = "png",
+    ) -> str:
+        """Build a WMTS overseas satellite theme tile URL."""
+
+        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        return self._tile_url(
+            "wmts",
+            (
+                TileLayer.SATELLITE.value,
+                "themes",
+                category,
+                str(year),
+                city,
+                str(tile_matrix),
+                str(tile_row),
+                f"{tile_col}.{tile_type}",
+            ),
+        )
+
+    async def get_wmts_theme_tile(self, *args: Any, **kwargs: Any) -> BinaryResponse:
+        """Fetch a WMTS overseas satellite theme tile asynchronously."""
+
+        return await self._fetch_absolute(self.wmts_theme_tile_url(*args, **kwargs))
+
+    def wmts_capabilities_url(self) -> str:
+        """Build the WMTS GetCapabilities URL."""
+
+        return self._tile_url("wmts", ("WMTSCapabilities.xml",))
+
+    async def get_wmts_capabilities(self) -> TextResponse:
+        """Fetch WMTS capabilities XML asynchronously."""
+
+        return await self._fetch_absolute_text(self.wmts_capabilities_url())
+
+    def tms_resource_url(self) -> str:
+        """Build the TMS TileMap resource URL."""
+
+        return self._tile_url("tms", ())
+
+    async def get_tms_resource(self) -> TextResponse:
+        """Fetch the TMS TileMap resource XML asynchronously."""
+
+        return await self._fetch_absolute_text(self.tms_resource_url())
+
+    def tms_tile_url(
+        self,
+        tile_map: str | TileLayer,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        *,
+        tile_type: str | None = None,
+    ) -> str:
+        """Build a TMS tile URL."""
+
+        layer_text = self._normalize_tile_layer(tile_map)
+        ext = tile_type or _TILE_EXTENSIONS[layer_text]
+        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        return self._tile_url(
+            "tms",
+            (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
+        )
+
+    async def get_tms_tile(self, *args: Any, **kwargs: Any) -> BinaryResponse:
+        """Fetch a TMS tile asynchronously."""
+
+        return await self._fetch_absolute(self.tms_tile_url(*args, **kwargs))
+
+    def tms_theme_tile_url(
+        self,
+        category: str,
+        year: int | str,
+        city: str,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        *,
+        tile_type: str = "png",
+    ) -> str:
+        """Build a TMS overseas satellite theme tile URL."""
+
+        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        return self._tile_url(
+            "tms",
+            (
+                TileLayer.SATELLITE.value,
+                "themes",
+                category,
+                str(year),
+                city,
+                str(tile_matrix),
+                str(tile_row),
+                f"{tile_col}.{tile_type}",
+            ),
+        )
+
+    async def get_tms_theme_tile(self, *args: Any, **kwargs: Any) -> BinaryResponse:
+        """Fetch a TMS overseas satellite theme tile asynchronously."""
+
+        return await self._fetch_absolute(self.tms_theme_tile_url(*args, **kwargs))
+
+    def _tile_url(self, service: str, parts: tuple[str, ...]) -> str:
+        http = self._require_http()
+        encoded = "/".join(quote(part, safe=".") for part in parts)
+        suffix = f"/{encoded}" if encoded else ""
+        return f"{http.BASE_URL}/req/{service}/1.0.0/{quote(http.api_key, safe='')}{suffix}"
+
+    async def _fetch_absolute(self, url: str) -> BinaryResponse:
+        http = self._require_http()
+        path = url.removeprefix(http.BASE_URL)
+        content, content_type = await http.get_bytes(path, params={}, include_key=False)
+        return BinaryResponse(content=content, content_type=content_type)
+
+    async def _fetch_absolute_text(self, url: str) -> TextResponse:
+        http = self._require_http()
+        path = url.removeprefix(http.BASE_URL)
+        text, content_type = await http.get_text(path, params={}, include_key=False)
+        return TextResponse(text=text, content_type=content_type)
+
+    def _normalize_tile_layer(self, layer: str | TileLayer) -> str:
+        text = layer.value if isinstance(layer, TileLayer) else str(layer)
+        for valid in _TILE_ZOOM_RANGES:
+            if text.lower() == valid.lower():
+                return valid
+        raise VworldInvalidParameterError(
+            "layer must be Base, white, midnight, Hybrid, or Satellite"
+        )
+
+    def _validate_tile(
+        self,
+        layer: str,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        tile_type: str,
+    ) -> None:
+        min_zoom, max_zoom = _TILE_ZOOM_RANGES[layer]
+        validate_zoom(tile_matrix, min_zoom=min_zoom, max_zoom=max_zoom)
+        if tile_row < 0 or tile_col < 0:
+            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
+        allowed = _TILE_EXTENSIONS[layer]
+        if tile_type.lower() != allowed.lower():
+            raise VworldInvalidParameterError(f"{layer} tile_type must be {allowed}")
+
+    def _validate_theme_tile(
+        self,
+        tile_matrix: int,
+        tile_row: int,
+        tile_col: int,
+        tile_type: str,
+    ) -> None:
+        validate_zoom(tile_matrix, min_zoom=6, max_zoom=19)
+        if tile_row < 0 or tile_col < 0:
+            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
+        if tile_type.lower() not in {"png", "jpeg", "jpg"}:
+            raise VworldInvalidParameterError("theme tile_type must be png, jpeg, or jpg")
+
     def build_rest_url(self, path: str, params: dict[str, Any] | None = None) -> str:
         """Build an authenticated URL for an advanced VWorld REST request."""
 
