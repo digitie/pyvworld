@@ -1,14 +1,14 @@
-# Changelog
+# 변경 기록
 
 ## 0.1.0
 
-- Initial python-vworld-api package.
-- Added VWorld Search, Geocoder, 2D Data, WMS/WFS, Legend, StaticMap, WMTS, and TMS wrappers.
-- Added official 2D Data API 2.0 catalog with 158 service IDs.
-- Added offline tests for parameter normalization, HTTP error mapping, endpoint query construction, image/tile URL generation, and catalog integrity.
-- Added opt-in live smoke tests for real VWorld server verification.
-- Added local `.env` loading via `VworldClient.from_env_file()`.
-- Added public enums, typed coordinate models, official StaticMap/Image enum values, and explicit domain override handling for typed external usage.
-- Converted public value/response models to frozen Pydantic v2 models while preserving existing constructors and validation exceptions.
-- Hid API keys from internal HTTP helper repr output.
-- Added README and implementation notes for future maintenance.
+- 초기 `python-vworld-api` package 추가.
+- VWorld Search, Geocoder, 2D Data, WMS/WFS, Legend, StaticMap, WMTS, TMS wrapper 추가.
+- 공식 2D Data API 2.0 catalog 158개 service ID 추가.
+- Parameter normalization, HTTP error mapping, endpoint query construction, image/tile URL generation, catalog integrity를 확인하는 offline test 추가.
+- 실제 VWorld server 검증을 위한 opt-in live smoke test 추가.
+- `VworldClient.from_env_file()`을 통한 local `.env` loading 추가.
+- 공개 enum, typed coordinate model, 공식 StaticMap/Image enum value, typed external usage를 위한 explicit domain override handling 추가.
+- 공개 value/response model을 frozen Pydantic v2 model로 전환하고 기존 constructor와 validation exception을 보존.
+- 내부 HTTP helper repr에서 API key를 숨김.
+- 이후 유지보수를 위한 README와 implementation note 추가.
