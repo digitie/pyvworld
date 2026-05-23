@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from vworld.debug import DebugRun
 
-from .fixture_writer import jsonable, slugify
+from .fixture_writer import jsonable, redact_sensitive, slugify
 
 
 def append_history(base_dir: str | Path, debug_run: DebugRun) -> Path:
@@ -19,11 +19,12 @@ def append_history(base_dir: str | Path, debug_run: DebugRun) -> Path:
     now = datetime.now(ZoneInfo("Asia/Seoul"))
     history_dir = Path(base_dir) / now.strftime("%Y-%m-%d")
     history_dir.mkdir(parents=True, exist_ok=True)
-    path = history_dir / f"{now.strftime('%H%M%S')}_{slugify(debug_run.function)}.json"
+    timestamp = now.strftime("%H%M%S_%f")[:10]
+    path = history_dir / f"{timestamp}_{slugify(debug_run.function)}.json"
     payload = {
         "created_at": now.isoformat(),
         "function": debug_run.function,
-        "input": debug_run.input,
+        "input": redact_sensitive(debug_run.input),
         "status_code": debug_run.response.get("status_code"),
         "error": debug_run.error,
     }

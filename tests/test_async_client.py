@@ -107,3 +107,135 @@ def test_async_validation_and_missing_key(monkeypatch):
     monkeypatch.delenv("VWORLD_KEY", raising=False)
     with pytest.raises(VworldAuthError):
         asyncio.run(AsyncVworldClient(api_key=None).search_place("판교"))
+
+
+def test_async_search_address(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.search_address("성남시 분당구 판교로 242")
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["type"] == ["address"]
+    assert query["category"] == ["road"]
+    assert query["query"] == ["성남시 분당구 판교로 242"]
+
+
+def test_async_search_district(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.search_district("삼평동")
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["type"] == ["district"]
+    assert query["category"] == ["L4"]
+
+
+def test_async_search_road(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.search_road("판교로")
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["type"] == ["road"]
+    assert query["query"] == ["판교로"]
+
+
+def test_async_reverse_geocode(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/address", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.reverse_geocode((127.101313354, 37.402352535))
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["request"] == ["getaddress"]
+    assert query["point"] == ["127.101313354,37.402352535"]
+
+
+def test_async_reverse_geocode_latlon(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/address", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.reverse_geocode_latlon(37.402352535, 127.101313354)
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["request"] == ["getaddress"]
+    assert query["point"] == ["127.101313354,37.402352535"]
+
+
+def test_async_get_data_feature_type(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/data", json=ok_payload)
+
+    async def run() -> dict:
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.get_data_feature_type("LT_C_ADEMD_INFO")
+
+    payload = asyncio.run(run())
+
+    assert payload == ok_payload
+    query = _query(http_mock.calls[0])
+    assert query["request"] == ["GetFeatureType"]
+    assert query["data"] == ["LT_C_ADEMD_INFO"]
+
+
+def test_async_wms_get_capabilities(http_mock):
+    http_mock.add(
+        "GET",
+        BASE + "/req/wms",
+        body="<WMS_Capabilities/>",
+        content_type="text/xml",
+    )
+
+    async def run():
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.wms_get_capabilities()
+
+    result = asyncio.run(run())
+
+    assert result.text == "<WMS_Capabilities/>"
+    query = _query(http_mock.calls[0])
+    assert query["SERVICE"] == ["WMS"]
+    assert query["REQUEST"] == ["GetCapabilities"]
+
+
+def test_async_wfs_get_feature(http_mock):
+    http_mock.add(
+        "GET",
+        BASE + "/req/wfs",
+        body="<wfs:FeatureCollection/>",
+        content_type="text/xml",
+    )
+
+    async def run():
+        async with AsyncVworldClient("test-key", retry_backoff=0) as client:
+            return await client.wfs_get_feature("lt_c_landinfobasemap")
+
+    result = asyncio.run(run())
+
+    assert result.text == "<wfs:FeatureCollection/>"
+    query = _query(http_mock.calls[0])
+    assert query["SERVICE"] == ["WFS"]
+    assert query["REQUEST"] == ["GetFeature"]
+    assert query["TYPENAME"] == ["lt_c_landinfobasemap"]

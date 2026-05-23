@@ -87,12 +87,13 @@ def test_iter_pages_rejects_bad_guards(kwargs: dict[str, int]) -> None:
         {},
         {"response": {"page": "bad"}},
         {"response": {"page": {"total": "bad", "current": "1", "size": "10"}}},
-        {"response": {"result": {"items": ["not-an-object"]}}},
     ],
 )
-def test_pagination_helpers_reject_bad_response_shapes(payload: dict[str, object]) -> None:
+def test_page_info_rejects_bad_response_shapes(payload: dict[str, object]) -> None:
     with pytest.raises(VworldServerError):
-        if "result" in str(payload):
-            response_items(payload)
-        else:
-            response_page_info(payload)
+        response_page_info(payload)
+
+
+def test_response_items_rejects_non_object_items() -> None:
+    with pytest.raises(VworldServerError):
+        response_items({"response": {"result": {"items": ["not-an-object"]}}})

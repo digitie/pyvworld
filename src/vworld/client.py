@@ -88,6 +88,299 @@ def _text_value(value: str | Enum) -> str:
     return str(value.value) if isinstance(value, Enum) else str(value)
 
 
+def _with_domain_params(
+    params: JsonObject, instance_domain: str | None, domain: str | None = None
+) -> JsonObject:
+    if domain is not None:
+        params["domain"] = domain
+    elif instance_domain:
+        params["domain"] = instance_domain
+    return params
+
+
+def _make_search_params(
+    query: str,
+    type: str | SearchType,
+    *,
+    category: SearchCategory | None,
+    size: int,
+    page: int,
+    bbox: BBoxLike | None,
+    crs: str | Crs,
+    callback: str | None,
+) -> JsonObject:
+    if not query:
+        raise VworldInvalidParameterError("query must not be empty")
+    normalized_type = _text_value(type).lower()
+    if normalized_type not in {"place", "address", "district", "road"}:
+        raise VworldInvalidParameterError("type must be place, address, district, or road")
+    if normalized_type in {"address", "district"} and category is None:
+        raise VworldInvalidParameterError(
+            "category is required for address and district search"
+        )
+    validate_page_size(size)
+    validate_page(page)
+    return {
+        "service": "search",
+        "request": "search",
+        "version": _REST_VERSION,
+        "format": _DEFAULT_FORMAT,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "query": query,
+        "type": normalized_type,
+        "category": csv(category),
+        "size": size,
+        "page": page,
+        "bbox": bbox_param(bbox),
+        "crs": crs,
+        "callback": callback,
+    }
+
+
+def _make_get_coord_params(
+    address: str,
+    type: str | AddressType,
+    *,
+    refine: bool,
+    simple: bool,
+    crs: str | Crs,
+    callback: str | None,
+) -> JsonObject:
+    if not address:
+        raise VworldInvalidParameterError("address must not be empty")
+    normalized_type = _text_value(type).lower()
+    if normalized_type not in {"road", "parcel"}:
+        raise VworldInvalidParameterError("type must be road or parcel")
+    return {
+        "service": "address",
+        "request": "getcoord",
+        "version": _REST_VERSION,
+        "format": _DEFAULT_FORMAT,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "type": normalized_type,
+        "address": address,
+        "refine": refine,
+        "simple": simple,
+        "crs": crs,
+        "callback": callback,
+    }
+
+
+def _make_get_address_params(
+    point_value: PointLike,
+    *,
+    type: str | ReverseGeocodeType,
+    zipcode: bool,
+    simple: bool,
+    crs: str | Crs,
+    callback: str | None,
+) -> JsonObject:
+    normalized_type = _text_value(type).lower()
+    if normalized_type not in {"road", "parcel", "both"}:
+        raise VworldInvalidParameterError("type must be road, parcel, or both")
+    return {
+        "service": "address",
+        "request": "getaddress",
+        "version": _REST_VERSION,
+        "format": _DEFAULT_FORMAT,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "point": point(point_value),
+        "type": normalized_type,
+        "zipcode": zipcode,
+        "simple": simple,
+        "crs": crs,
+        "callback": callback,
+    }
+
+
+def _make_data_feature_params(
+    data: str,
+    *,
+    geom_filter: str | None,
+    attr_filter: StringList | None,
+    columns: StringList | None,
+    geometry: bool,
+    attribute: bool,
+    buffer: int | float | None,
+    size: int,
+    page: int,
+    crs: str | Crs,
+    callback: str | None,
+) -> JsonObject:
+    if not data:
+        raise VworldInvalidParameterError("data must not be empty")
+    validate_page_size(size)
+    validate_page(page)
+    return {
+        "service": "data",
+        "request": "GetFeature",
+        "version": _REST_VERSION,
+        "format": _DEFAULT_FORMAT,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "data": data,
+        "geomFilter": geom_filter,
+        "attrFilter": _attr_filter(attr_filter),
+        "columns": csv(columns),
+        "geometry": geometry,
+        "attribute": attribute,
+        "buffer": buffer,
+        "size": size,
+        "page": page,
+        "crs": crs,
+        "callback": callback,
+    }
+
+
+def _make_data_feature_type_params(
+    data: str,
+    *,
+    crs: str | Crs,
+    callback: str | None,
+) -> JsonObject:
+    if not data:
+        raise VworldInvalidParameterError("data must not be empty")
+    return {
+        "service": "data",
+        "request": "GetFeatureType",
+        "version": _REST_VERSION,
+        "format": _DEFAULT_FORMAT,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "data": data,
+        "crs": crs,
+        "callback": callback,
+    }
+
+
+def _make_legend_params(
+    request: str,
+    layer: str,
+    *,
+    style: str | None = None,
+    type: str | LegendType = LegendType.ALL,
+    format: str | ImageFormat = ImageFormat.PNG,
+) -> JsonObject:
+    if not layer:
+        raise VworldInvalidParameterError("layer must not be empty")
+    type_value = _text_value(type).upper()
+    if type_value not in {"ALL", "LAYER", "SUB"}:
+        raise VworldInvalidParameterError("type must be ALL, LAYER, or SUB")
+    return {
+        "service": "image",
+        "request": request,
+        "version": _REST_VERSION,
+        "format": format,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "layer": layer,
+        "style": style,
+        "type": type_value,
+    }
+
+
+def _make_static_map_params(
+    *,
+    center: PointLike,
+    zoom: int,
+    size: str | tuple[int, int],
+    basemap: str | StaticMapBase = StaticMapBase.GRAPHIC,
+    crs: str | Crs = _DEFAULT_CRS,
+    format: str | ImageFormat = ImageFormat.PNG,
+    layers: str | list[str] | tuple[str, ...] | None = None,
+    styles: str | list[str] | tuple[str, ...] | None = None,
+    marker: str | list[str] | tuple[str, ...] | None = None,
+    route: str | list[str] | tuple[str, ...] | None = None,
+) -> JsonObject:
+    validate_zoom(zoom)
+    validate_static_size(size)
+    return {
+        "service": "image",
+        "request": "getmap",
+        "version": _REST_VERSION,
+        "format": format,
+        "errorformat": _DEFAULT_ERROR_FORMAT,
+        "basemap": basemap,
+        "center": point(center),
+        "crs": crs,
+        "zoom": zoom,
+        "size": pixel_size(size),
+        "layers": csv(layers),
+        "styles": csv(styles),
+        "marker": marker,
+        "route": route,
+    }
+
+
+def _make_wms_get_map_params(
+    *,
+    layers: str | list[str] | tuple[str, ...],
+    bbox: BBoxLike,
+    width: int,
+    height: int,
+    styles: str | list[str] | tuple[str, ...] | None = None,
+    crs: str | Crs = _DEFAULT_OGC_CRS,
+    format: str = "image/png",
+    transparent: bool = False,
+    bgcolor: str = "0xFFFFFF",
+    exceptions: str = "text/xml",
+    version: str = "1.3.0",
+) -> JsonObject:
+    if width <= 0 or height <= 0:
+        raise VworldInvalidParameterError("width and height must be positive")
+    return {
+        "SERVICE": "WMS",
+        "REQUEST": "GetMap",
+        "VERSION": version,
+        "LAYERS": csv(layers),
+        "STYLES": csv(styles),
+        "CRS": crs,
+        "BBOX": bbox_param(bbox),
+        "WIDTH": width,
+        "HEIGHT": height,
+        "FORMAT": format,
+        "TRANSPARENT": transparent,
+        "BGCOLOR": bgcolor,
+        "EXCEPTIONS": exceptions,
+    }
+
+
+def _normalize_tile_layer(layer: str | TileLayer) -> str:
+    text = layer.value if isinstance(layer, TileLayer) else str(layer)
+    for valid in _TILE_ZOOM_RANGES:
+        if text.lower() == valid.lower():
+            return valid
+    raise VworldInvalidParameterError(
+        "layer must be Base, white, midnight, Hybrid, or Satellite"
+    )
+
+
+def _validate_tile(
+    layer: str,
+    tile_matrix: int,
+    tile_row: int,
+    tile_col: int,
+    tile_type: str,
+) -> None:
+    min_zoom, max_zoom = _TILE_ZOOM_RANGES[layer]
+    validate_zoom(tile_matrix, min_zoom=min_zoom, max_zoom=max_zoom)
+    if tile_row < 0 or tile_col < 0:
+        raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
+    allowed = _TILE_EXTENSIONS[layer]
+    if tile_type.lower() != allowed.lower():
+        raise VworldInvalidParameterError(f"{layer} tile_type must be {allowed}")
+
+
+def _validate_theme_tile(
+    tile_matrix: int,
+    tile_row: int,
+    tile_col: int,
+    tile_type: str,
+) -> None:
+    validate_zoom(tile_matrix, min_zoom=6, max_zoom=19)
+    if tile_row < 0 or tile_col < 0:
+        raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
+    if tile_type.lower() not in {"png", "jpeg", "jpg"}:
+        raise VworldInvalidParameterError("theme tile_type must be png, jpeg, or jpg")
+
+
 def _read_env_file(path: str | os.PathLike[str]) -> dict[str, str]:
     env_path = Path(path)
     values: dict[str, str] = {}
@@ -188,11 +481,7 @@ class VworldClient:
         self.close()
 
     def _with_domain(self, params: JsonObject, domain: str | None = None) -> JsonObject:
-        if domain is not None:
-            params["domain"] = domain
-        elif self.domain:
-            params["domain"] = self.domain
-        return params
+        return _with_domain_params(params, self.domain, domain)
 
     # Search API 2.0
     def search(
@@ -209,33 +498,10 @@ class VworldClient:
     ) -> JsonObject:
         """Call Search API 2.0 (``/req/search``)."""
 
-        if not query:
-            raise VworldInvalidParameterError("query must not be empty")
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"place", "address", "district", "road"}:
-            raise VworldInvalidParameterError("type must be place, address, district, or road")
-        if normalized_type in {"address", "district"} and category is None:
-            raise VworldInvalidParameterError(
-                "category is required for address and district search"
-            )
-        validate_page_size(size)
-        validate_page(page)
-
-        params = {
-            "service": "search",
-            "request": "search",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "query": query,
-            "type": normalized_type,
-            "category": csv(category),
-            "size": size,
-            "page": page,
-            "bbox": bbox_param(bbox),
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_search_params(
+            query, type, category=category, size=size, page=page,
+            bbox=bbox, crs=crs, callback=callback,
+        )
         return self._require_http().get_json("/req/search", params)
 
     def search_place(self, query: str, **kwargs: Any) -> JsonObject:
@@ -351,24 +617,9 @@ class VworldClient:
     ) -> JsonObject:
         """Convert an address to coordinates via Geocoder API 2.0."""
 
-        if not address:
-            raise VworldInvalidParameterError("address must not be empty")
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"road", "parcel"}:
-            raise VworldInvalidParameterError("type must be road or parcel")
-        params = {
-            "service": "address",
-            "request": "getcoord",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "type": normalized_type,
-            "address": address,
-            "refine": refine,
-            "simple": simple,
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_get_coord_params(
+            address, type, refine=refine, simple=simple, crs=crs, callback=callback,
+        )
         return self._require_http().get_json("/req/address", params)
 
     def geocode(
@@ -393,22 +644,9 @@ class VworldClient:
     ) -> JsonObject:
         """Convert coordinates to road and/or parcel addresses."""
 
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"road", "parcel", "both"}:
-            raise VworldInvalidParameterError("type must be road, parcel, or both")
-        params = {
-            "service": "address",
-            "request": "getaddress",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "point": point(point_value),
-            "type": normalized_type,
-            "zipcode": zipcode,
-            "simple": simple,
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_get_address_params(
+            point_value, type=type, zipcode=zipcode, simple=simple, crs=crs, callback=callback,
+        )
         return self._require_http().get_json("/req/address", params)
 
     def reverse_geocode(self, point_value: PointLike, **kwargs: Any) -> JsonObject:
@@ -440,29 +678,12 @@ class VworldClient:
     ) -> JsonObject:
         """Query 2D Data API 2.0 features via ``/req/data``."""
 
-        if not data:
-            raise VworldInvalidParameterError("data must not be empty")
-        validate_page_size(size)
-        validate_page(page)
         params = self._with_domain(
-            {
-                "service": "data",
-                "request": "GetFeature",
-                "version": _REST_VERSION,
-                "format": _DEFAULT_FORMAT,
-                "errorformat": _DEFAULT_ERROR_FORMAT,
-                "data": data,
-                "geomFilter": geom_filter,
-                "attrFilter": _attr_filter(attr_filter),
-                "columns": csv(columns),
-                "geometry": geometry,
-                "attribute": attribute,
-                "buffer": buffer,
-                "size": size,
-                "page": page,
-                "crs": crs,
-                "callback": callback,
-            },
+            _make_data_feature_params(
+                data, geom_filter=geom_filter, attr_filter=attr_filter, columns=columns,
+                geometry=geometry, attribute=attribute, buffer=buffer, size=size, page=page,
+                crs=crs, callback=callback,
+            ),
             domain,
         )
         return self._require_http().get_json("/req/data", params)
@@ -561,19 +782,8 @@ class VworldClient:
     ) -> JsonObject:
         """Call the documented ``GetFeatureType`` operation for a 2D data service."""
 
-        if not data:
-            raise VworldInvalidParameterError("data must not be empty")
         params = self._with_domain(
-            {
-                "service": "data",
-                "request": "GetFeatureType",
-                "version": _REST_VERSION,
-                "format": _DEFAULT_FORMAT,
-                "errorformat": _DEFAULT_ERROR_FORMAT,
-                "data": data,
-                "crs": crs,
-                "callback": callback,
-            },
+            _make_data_feature_type_params(data, crs=crs, callback=callback),
             domain,
         )
         return self._require_http().get_json("/req/data", params)
@@ -600,56 +810,18 @@ class VworldClient:
         text, content_type = self._require_http().get_text("/req/wms", params)
         return TextResponse(text=text, content_type=content_type)
 
-    def wms_get_map_url(self, **kwargs: Any) -> str:
+    def wms_get_map_url(self, *, domain: str | None = None, **kwargs: Any) -> str:
         """Build a WMS ``GetMap`` URL without fetching it."""
 
-        return self._require_http().build_url("/req/wms", self._wms_get_map_params(**kwargs))
+        params = self._with_domain(_make_wms_get_map_params(**kwargs), domain)
+        return self._require_http().build_url("/req/wms", params)
 
-    def wms_get_map(self, **kwargs: Any) -> BinaryResponse:
+    def wms_get_map(self, *, domain: str | None = None, **kwargs: Any) -> BinaryResponse:
         """Call WMS ``GetMap`` and return map image bytes."""
 
-        content, content_type = self._require_http().get_bytes(
-            "/req/wms",
-            self._wms_get_map_params(**kwargs),
-        )
+        params = self._with_domain(_make_wms_get_map_params(**kwargs), domain)
+        content, content_type = self._require_http().get_bytes("/req/wms", params)
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _wms_get_map_params(
-        self,
-        *,
-        layers: str | list[str] | tuple[str, ...],
-        bbox: BBoxLike,
-        width: int,
-        height: int,
-        styles: str | list[str] | tuple[str, ...] | None = None,
-        crs: str | Crs = _DEFAULT_OGC_CRS,
-        format: str = "image/png",
-        transparent: bool = False,
-        bgcolor: str = "0xFFFFFF",
-        exceptions: str = "text/xml",
-        version: str = "1.3.0",
-        domain: str | None = None,
-    ) -> JsonObject:
-        if width <= 0 or height <= 0:
-            raise VworldInvalidParameterError("width and height must be positive")
-        return self._with_domain(
-            {
-                "SERVICE": "WMS",
-                "REQUEST": "GetMap",
-                "VERSION": version,
-                "LAYERS": csv(layers),
-                "STYLES": csv(styles),
-                "CRS": crs,
-                "BBOX": bbox_param(bbox),
-                "WIDTH": width,
-                "HEIGHT": height,
-                "FORMAT": format,
-                "TRANSPARENT": transparent,
-                "BGCOLOR": bgcolor,
-                "EXCEPTIONS": exceptions,
-            },
-            domain,
-        )
 
     def wms_get_feature_info(
         self,
@@ -806,96 +978,34 @@ class VworldClient:
         """Build a ``GetLegendGraphic`` URL without fetching it."""
 
         return self._require_http().build_url(
-            "/req/image",
-            self._legend_params("GetLegendGraphic", layer, **kwargs),
+            "/req/image", _make_legend_params("GetLegendGraphic", layer, **kwargs),
         )
 
     def legend_style_url(self, layer: str, **kwargs: Any) -> str:
         """Build a ``GetLegendStyle`` URL without fetching it."""
 
         return self._require_http().build_url(
-            "/req/image",
-            self._legend_params("GetLegendStyle", layer, **kwargs),
+            "/req/image", _make_legend_params("GetLegendStyle", layer, **kwargs),
         )
 
     def _image_legend(self, request: str, layer: str, **kwargs: Any) -> BinaryResponse:
         content, content_type = self._require_http().get_bytes(
-            "/req/image",
-            self._legend_params(request, layer, **kwargs),
+            "/req/image", _make_legend_params(request, layer, **kwargs),
         )
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _legend_params(
-        self,
-        request: str,
-        layer: str,
-        *,
-        style: str | None = None,
-        type: str | LegendType = LegendType.ALL,
-        format: str | ImageFormat = ImageFormat.PNG,
-    ) -> JsonObject:
-        if not layer:
-            raise VworldInvalidParameterError("layer must not be empty")
-        type_value = _text_value(type).upper()
-        if type_value not in {"ALL", "LAYER", "SUB"}:
-            raise VworldInvalidParameterError("type must be ALL, LAYER, or SUB")
-        return {
-            "service": "image",
-            "request": request,
-            "version": _REST_VERSION,
-            "format": format,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "layer": layer,
-            "style": style,
-            "type": type_value,
-        }
 
     def static_map_url(self, **kwargs: Any) -> str:
         """Build a StaticMap ``GetMap`` URL without fetching it."""
 
-        return self._require_http().build_url("/req/image", self._static_map_params(**kwargs))
+        return self._require_http().build_url("/req/image", _make_static_map_params(**kwargs))
 
     def static_map(self, **kwargs: Any) -> BinaryResponse:
         """Call StaticMap API 2.0 and return image bytes."""
 
         content, content_type = self._require_http().get_bytes(
-            "/req/image",
-            self._static_map_params(**kwargs),
+            "/req/image", _make_static_map_params(**kwargs),
         )
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _static_map_params(
-        self,
-        *,
-        center: PointLike,
-        zoom: int,
-        size: str | tuple[int, int],
-        basemap: str | StaticMapBase = StaticMapBase.GRAPHIC,
-        crs: str | Crs = _DEFAULT_CRS,
-        format: str | ImageFormat = ImageFormat.PNG,
-        layers: str | list[str] | tuple[str, ...] | None = None,
-        styles: str | list[str] | tuple[str, ...] | None = None,
-        marker: str | list[str] | tuple[str, ...] | None = None,
-        route: str | list[str] | tuple[str, ...] | None = None,
-    ) -> JsonObject:
-        validate_zoom(zoom)
-        validate_static_size(size)
-        return {
-            "service": "image",
-            "request": "getmap",
-            "version": _REST_VERSION,
-            "format": format,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "basemap": basemap,
-            "center": point(center),
-            "crs": crs,
-            "zoom": zoom,
-            "size": pixel_size(size),
-            "layers": csv(layers),
-            "styles": csv(styles),
-            "marker": marker,
-            "route": route,
-        }
 
     def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
         """Call StaticMap with a WGS84 latitude/longitude center."""
@@ -919,9 +1029,9 @@ class VworldClient:
     ) -> str:
         """Build a WMTS GetTile URL."""
 
-        layer_text = self._normalize_tile_layer(layer)
+        layer_text = _normalize_tile_layer(layer)
         ext = tile_type or _TILE_EXTENSIONS[layer_text]
-        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        _validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
         return self._tile_url(
             "wmts",
             (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
@@ -945,7 +1055,7 @@ class VworldClient:
     ) -> str:
         """Build a WMTS overseas satellite theme tile URL."""
 
-        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        _validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
         return self._tile_url(
             "wmts",
             (
@@ -1022,7 +1132,7 @@ class VworldClient:
     ) -> str:
         """Build a TMS overseas satellite theme tile URL."""
 
-        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        _validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
         return self._tile_url(
             "tms",
             (
@@ -1178,11 +1288,7 @@ class AsyncVworldClient:
         return self._http
 
     def _with_domain(self, params: JsonObject, domain: str | None = None) -> JsonObject:
-        if domain is not None:
-            params["domain"] = domain
-        elif self.domain:
-            params["domain"] = self.domain
-        return params
+        return _with_domain_params(params, self.domain, domain)
 
     async def search(
         self,
@@ -1198,33 +1304,7 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Call Search API 2.0 (``/req/search``) asynchronously."""
 
-        if not query:
-            raise VworldInvalidParameterError("query must not be empty")
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"place", "address", "district", "road"}:
-            raise VworldInvalidParameterError("type must be place, address, district, or road")
-        if normalized_type in {"address", "district"} and category is None:
-            raise VworldInvalidParameterError(
-                "category is required for address and district search"
-            )
-        validate_page_size(size)
-        validate_page(page)
-
-        params = {
-            "service": "search",
-            "request": "search",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "query": query,
-            "type": normalized_type,
-            "category": csv(category),
-            "size": size,
-            "page": page,
-            "bbox": bbox_param(bbox),
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_search_params(query, type, category=category, size=size, page=page, bbox=bbox, crs=crs, callback=callback)
         return await self._require_http().get_json("/req/search", params)
 
     async def search_place(self, query: str, **kwargs: Any) -> JsonObject:
@@ -1271,24 +1351,7 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Convert an address to coordinates via Geocoder API 2.0 asynchronously."""
 
-        if not address:
-            raise VworldInvalidParameterError("address must not be empty")
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"road", "parcel"}:
-            raise VworldInvalidParameterError("type must be road or parcel")
-        params = {
-            "service": "address",
-            "request": "getcoord",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "type": normalized_type,
-            "address": address,
-            "refine": refine,
-            "simple": simple,
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_get_coord_params(address, type, refine=refine, simple=simple, crs=crs, callback=callback)
         return await self._require_http().get_json("/req/address", params)
 
     async def geocode(
@@ -1313,22 +1376,7 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Convert coordinates to road and/or parcel addresses asynchronously."""
 
-        normalized_type = _text_value(type).lower()
-        if normalized_type not in {"road", "parcel", "both"}:
-            raise VworldInvalidParameterError("type must be road, parcel, or both")
-        params = {
-            "service": "address",
-            "request": "getaddress",
-            "version": _REST_VERSION,
-            "format": _DEFAULT_FORMAT,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "point": point(point_value),
-            "type": normalized_type,
-            "zipcode": zipcode,
-            "simple": simple,
-            "crs": crs,
-            "callback": callback,
-        }
+        params = _make_get_address_params(point_value, type=type, zipcode=zipcode, simple=simple, crs=crs, callback=callback)
         return await self._require_http().get_json("/req/address", params)
 
     async def reverse_geocode(self, point_value: PointLike, **kwargs: Any) -> JsonObject:
@@ -1359,29 +1407,8 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Query 2D Data API 2.0 features asynchronously."""
 
-        if not data:
-            raise VworldInvalidParameterError("data must not be empty")
-        validate_page_size(size)
-        validate_page(page)
         params = self._with_domain(
-            {
-                "service": "data",
-                "request": "GetFeature",
-                "version": _REST_VERSION,
-                "format": _DEFAULT_FORMAT,
-                "errorformat": _DEFAULT_ERROR_FORMAT,
-                "data": data,
-                "geomFilter": geom_filter,
-                "attrFilter": _attr_filter(attr_filter),
-                "columns": csv(columns),
-                "geometry": geometry,
-                "attribute": attribute,
-                "buffer": buffer,
-                "size": size,
-                "page": page,
-                "crs": crs,
-                "callback": callback,
-            },
+            _make_data_feature_params(data, geom_filter=geom_filter, attr_filter=attr_filter, columns=columns, geometry=geometry, attribute=attribute, buffer=buffer, size=size, page=page, crs=crs, callback=callback),
             domain,
         )
         return await self._require_http().get_json("/req/data", params)
@@ -1396,21 +1423,7 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Call the documented ``GetFeatureType`` operation asynchronously."""
 
-        if not data:
-            raise VworldInvalidParameterError("data must not be empty")
-        params = self._with_domain(
-            {
-                "service": "data",
-                "request": "GetFeatureType",
-                "version": _REST_VERSION,
-                "format": _DEFAULT_FORMAT,
-                "errorformat": _DEFAULT_ERROR_FORMAT,
-                "data": data,
-                "crs": crs,
-                "callback": callback,
-            },
-            domain,
-        )
+        params = self._with_domain(_make_data_feature_type_params(data, crs=crs, callback=callback), domain)
         return await self._require_http().get_json("/req/data", params)
 
     async def wms_get_capabilities(
@@ -1434,56 +1447,18 @@ class AsyncVworldClient:
         text, content_type = await self._require_http().get_text("/req/wms", params)
         return TextResponse(text=text, content_type=content_type)
 
-    def wms_get_map_url(self, **kwargs: Any) -> str:
+    def wms_get_map_url(self, *, domain: str | None = None, **kwargs: Any) -> str:
         """Build a WMS ``GetMap`` URL without fetching it."""
 
-        return self._require_http().build_url("/req/wms", self._wms_get_map_params(**kwargs))
+        params = self._with_domain(_make_wms_get_map_params(**kwargs), domain)
+        return self._require_http().build_url("/req/wms", params)
 
-    async def wms_get_map(self, **kwargs: Any) -> BinaryResponse:
+    async def wms_get_map(self, *, domain: str | None = None, **kwargs: Any) -> BinaryResponse:
         """Call WMS ``GetMap`` asynchronously and return map image bytes."""
 
-        content, content_type = await self._require_http().get_bytes(
-            "/req/wms",
-            self._wms_get_map_params(**kwargs),
-        )
+        params = self._with_domain(_make_wms_get_map_params(**kwargs), domain)
+        content, content_type = await self._require_http().get_bytes("/req/wms", params)
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _wms_get_map_params(
-        self,
-        *,
-        layers: str | list[str] | tuple[str, ...],
-        bbox: BBoxLike,
-        width: int,
-        height: int,
-        styles: str | list[str] | tuple[str, ...] | None = None,
-        crs: str | Crs = _DEFAULT_OGC_CRS,
-        format: str = "image/png",
-        transparent: bool = False,
-        bgcolor: str = "0xFFFFFF",
-        exceptions: str = "text/xml",
-        version: str = "1.3.0",
-        domain: str | None = None,
-    ) -> JsonObject:
-        if width <= 0 or height <= 0:
-            raise VworldInvalidParameterError("width and height must be positive")
-        return self._with_domain(
-            {
-                "SERVICE": "WMS",
-                "REQUEST": "GetMap",
-                "VERSION": version,
-                "LAYERS": csv(layers),
-                "STYLES": csv(styles),
-                "CRS": crs,
-                "BBOX": bbox_param(bbox),
-                "WIDTH": width,
-                "HEIGHT": height,
-                "FORMAT": format,
-                "TRANSPARENT": transparent,
-                "BGCOLOR": bgcolor,
-                "EXCEPTIONS": exceptions,
-            },
-            domain,
-        )
 
     async def wms_get_feature_info(
         self,
@@ -1652,7 +1627,7 @@ class AsyncVworldClient:
 
         return self._require_http().build_url(
             "/req/image",
-            self._legend_params("GetLegendGraphic", layer, **kwargs),
+            _make_legend_params("GetLegendGraphic", layer, **kwargs),
         )
 
     def legend_style_url(self, layer: str, **kwargs: Any) -> str:
@@ -1660,87 +1635,29 @@ class AsyncVworldClient:
 
         return self._require_http().build_url(
             "/req/image",
-            self._legend_params("GetLegendStyle", layer, **kwargs),
+            _make_legend_params("GetLegendStyle", layer, **kwargs),
         )
 
     async def _image_legend(self, request: str, layer: str, **kwargs: Any) -> BinaryResponse:
         content, content_type = await self._require_http().get_bytes(
             "/req/image",
-            self._legend_params(request, layer, **kwargs),
+            _make_legend_params(request, layer, **kwargs),
         )
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _legend_params(
-        self,
-        request: str,
-        layer: str,
-        *,
-        style: str | None = None,
-        type: str | LegendType = LegendType.ALL,
-        format: str | ImageFormat = ImageFormat.PNG,
-    ) -> JsonObject:
-        if not layer:
-            raise VworldInvalidParameterError("layer must not be empty")
-        type_value = _text_value(type).upper()
-        if type_value not in {"ALL", "LAYER", "SUB"}:
-            raise VworldInvalidParameterError("type must be ALL, LAYER, or SUB")
-        return {
-            "service": "image",
-            "request": request,
-            "version": _REST_VERSION,
-            "format": format,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "layer": layer,
-            "style": style,
-            "type": type_value,
-        }
 
     def static_map_url(self, **kwargs: Any) -> str:
         """Build a StaticMap ``GetMap`` URL without fetching it."""
 
-        return self._require_http().build_url("/req/image", self._static_map_params(**kwargs))
+        return self._require_http().build_url("/req/image", _make_static_map_params(**kwargs))
 
     async def static_map(self, **kwargs: Any) -> BinaryResponse:
         """Call StaticMap API 2.0 asynchronously and return image bytes."""
 
         content, content_type = await self._require_http().get_bytes(
             "/req/image",
-            self._static_map_params(**kwargs),
+            _make_static_map_params(**kwargs),
         )
         return BinaryResponse(content=content, content_type=content_type)
-
-    def _static_map_params(
-        self,
-        *,
-        center: PointLike,
-        zoom: int,
-        size: str | tuple[int, int],
-        basemap: str | StaticMapBase = StaticMapBase.GRAPHIC,
-        crs: str | Crs = _DEFAULT_CRS,
-        format: str | ImageFormat = ImageFormat.PNG,
-        layers: str | list[str] | tuple[str, ...] | None = None,
-        styles: str | list[str] | tuple[str, ...] | None = None,
-        marker: str | list[str] | tuple[str, ...] | None = None,
-        route: str | list[str] | tuple[str, ...] | None = None,
-    ) -> JsonObject:
-        validate_zoom(zoom)
-        validate_static_size(size)
-        return {
-            "service": "image",
-            "request": "getmap",
-            "version": _REST_VERSION,
-            "format": format,
-            "errorformat": _DEFAULT_ERROR_FORMAT,
-            "basemap": basemap,
-            "center": point(center),
-            "crs": crs,
-            "zoom": zoom,
-            "size": pixel_size(size),
-            "layers": csv(layers),
-            "styles": csv(styles),
-            "marker": marker,
-            "route": route,
-        }
 
     async def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
         """Call StaticMap with a WGS84 latitude/longitude center asynchronously."""
@@ -1763,9 +1680,9 @@ class AsyncVworldClient:
     ) -> str:
         """Build a WMTS GetTile URL."""
 
-        layer_text = self._normalize_tile_layer(layer)
+        layer_text = _normalize_tile_layer(layer)
         ext = tile_type or _TILE_EXTENSIONS[layer_text]
-        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        _validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
         return self._tile_url(
             "wmts",
             (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
@@ -1789,7 +1706,7 @@ class AsyncVworldClient:
     ) -> str:
         """Build a WMTS overseas satellite theme tile URL."""
 
-        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        _validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
         return self._tile_url(
             "wmts",
             (
@@ -1866,7 +1783,7 @@ class AsyncVworldClient:
     ) -> str:
         """Build a TMS overseas satellite theme tile URL."""
 
-        self._validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
+        _validate_theme_tile(tile_matrix, tile_row, tile_col, tile_type)
         return self._tile_url(
             "tms",
             (

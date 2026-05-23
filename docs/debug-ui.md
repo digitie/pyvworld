@@ -21,6 +21,7 @@ debug-ui/
   pyproject.toml
   app.py
   vworld_debug_ui/
+    __init__.py
     fixture_writer.py
     history_store.py
     preset_store.py
@@ -74,7 +75,7 @@ streamlit run app.py
 - `assertion`: replay assertion mode와 제외/필수 필드
 - `meta`: 생성 시각, 라이브러리 버전, source
 
-Fixture writer는 API key, Authorization header, access token, refresh token, VWorld `key` query, WMTS/TMS path key를 저장 전에 마스킹합니다. 같은 fixture 파일명은 기본적으로 덮어쓰지 않습니다.
+Fixture writer는 `input`, `request`, `response`, `parsed`, `processed` 모든 필드에서 API key, Authorization header, access token, refresh token, VWorld `key` query, WMTS/TMS path key를 저장 전에 마스킹합니다. 같은 fixture 파일명은 기본적으로 덮어쓰지 않습니다.
 
 ## Replay 테스트
 

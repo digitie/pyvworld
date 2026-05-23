@@ -107,8 +107,8 @@ def save_fixture(
         "input": redact_sensitive(jsonable(input_data)),
         "request": redact_sensitive(jsonable(request_data)),
         "response": redact_sensitive(jsonable(response_data)),
-        "parsed": jsonable(parsed_result),
-        "processed": jsonable(processed_result),
+        "parsed": redact_sensitive(jsonable(parsed_result)),
+        "processed": redact_sensitive(jsonable(processed_result)),
         "assertion": dict(assertion or _default_assertion()),
         "meta": {
             "created_at": datetime.now(ZoneInfo("Asia/Seoul")).isoformat(),
@@ -136,7 +136,8 @@ def _sensitive_key(key: str) -> bool:
 
 def _redact_url_text(value: str) -> str:
     query_pattern = (
-        r"(?i)([?&](?:api_key|apikey|authkey|auth_key|key|servicekey|service_key)=)"
+        r"(?i)([?&](?:api_key|apikey|authkey|auth_key|key|servicekey|service_key"
+        r"|access_token|refresh_token)=)"
         r"[^&#\s]+"
     )
     value = re.sub(query_pattern, r"\1<REDACTED>", value)

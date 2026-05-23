@@ -273,3 +273,53 @@ def test_iter_data_feature_pages_preserves_request_params(client, http_mock):
     assert query["columns"] == ["emd_cd"]
     assert query["geometry"] == ["false"]
     assert query["domain"] == [""]
+
+
+def test_iter_data_feature_items_follows_pages_and_caps_items(client, http_mock):
+    http_mock.add(
+        "GET",
+        BASE + "/req/data",
+        json={
+            "response": {
+                "status": "OK",
+                "record": {"total": "4", "current": "2"},
+                "page": {"total": "2", "current": "1", "size": "2"},
+                "result": {"items": [{"id": "1"}, {"id": "2"}]},
+            }
+        },
+    )
+    http_mock.add(
+        "GET",
+        BASE + "/req/data",
+        json={
+            "response": {
+                "status": "OK",
+                "record": {"total": "4", "current": "2"},
+                "page": {"total": "2", "current": "2", "size": "2"},
+                "result": {"items": [{"id": "3"}, {"id": "4"}]},
+            }
+        },
+    )
+
+    items = list(
+        client.iter_data_feature_items("LT_C_ADEMD_INFO", size=2, max_items=3)
+    )
+
+    assert [item["id"] for item in items] == ["1", "2", "3"]
+    assert _query(http_mock.calls[0])["page"] == ["1"]
+    assert _query(http_mock.calls[1])["page"] == ["2"]
+
+
+def test_client_close_and_context_manager(ok_payload, http_mock):
+    http_mock.add("GET", BASE + "/req/search", json=ok_payload)
+
+    with VworldClient("test-key", retry_backoff=0) as c:
+        c.search_place("판교")
+
+    # After exiting the context manager, the client should still be usable
+    # for attribute access (close doesn't nullify the http object).
+    assert c.api_key == "test-key"
+
+    # Explicitly test close() on a standalone client
+    standalone = VworldClient("test-key", retry_backoff=0)
+    standalone.close()  # should not raise
