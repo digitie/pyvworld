@@ -86,7 +86,10 @@ class HttpxMock:
 
 @pytest.fixture
 def http_mock() -> HttpxMock:
-    return HttpxMock()
+    mock = HttpxMock()
+    yield mock
+    unconsumed = [f"{r.method} {r.url}" for r in mock.routes]
+    assert not unconsumed, f"unconsumed HttpxMock routes: {unconsumed}"
 
 
 @pytest.fixture(autouse=True)
@@ -112,3 +115,12 @@ def client(http_mock: HttpxMock) -> VworldClient:
 @pytest.fixture
 def ok_payload() -> dict[str, Any]:
     return {"response": {"status": "OK", "result": {"items": []}}}
+
+
+BASE_URL = "https://api.vworld.kr"
+
+
+def query_params(call: RecordedCall) -> dict[str, list[str]]:
+    from urllib.parse import parse_qs, urlparse
+
+    return parse_qs(urlparse(str(call.request.url)).query, keep_blank_values=True)

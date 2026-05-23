@@ -77,10 +77,6 @@ def _sidebar() -> tuple[ApiCatalogEntry, str, str | None, float, str, Path]:
     st.sidebar.subheader("Preset")
     preset_name = st.sidebar.selectbox("Preset", preset_names)
 
-    st.sidebar.subheader("Environment")
-    environment = st.sidebar.selectbox("Environment", ("local", "release-wheel"))
-    st.sidebar.caption(f"Environment: {environment}")
-
     default_key, default_domain = _default_client_settings()
     st.sidebar.subheader("Auth")
     api_key = st.sidebar.text_input(
@@ -133,7 +129,10 @@ def _result_tabs(
 
     current_input: dict[str, Any] = {}
     with raw_tab:
-        current_input = _raw_response_tab(selected_entry, client, preset_name=preset_name)
+        try:
+            current_input = _raw_response_tab(selected_entry, client, preset_name=preset_name)
+        except Exception as exc:
+            st.error(f"Raw Response 실행 중 오류: {exc}")
     with parsed_tab:
         _pydantic_model_tab(selected_entry)
     with processed_tab:

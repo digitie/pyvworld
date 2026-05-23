@@ -171,3 +171,16 @@ def test_build_url_can_omit_key():
 
 def test_http_repr_does_not_expose_api_key():
     assert "secret-key" not in repr(_VworldHttp("secret-key", retry_backoff=0))
+
+
+def test_http_close_calls_session_close():
+    closed = []
+
+    class FakeSession:
+        def close(self):
+            closed.append(True)
+
+    http = _VworldHttp("test-key", retry_backoff=0, session=FakeSession())
+    http.close()
+
+    assert closed == [True]

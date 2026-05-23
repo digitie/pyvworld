@@ -53,7 +53,7 @@ Debug UI fixture는 `tests/fixtures/{function}/{case}.json`에 저장한다. Com
 - `schema_only`: parsing과 processing 완료 여부 확인
 - `required_fields`: dot-separated field가 processed output에 존재하는지 확인
 
-Fixture에는 VWorld API key, Authorization header, access token, refresh token, tile path key를 저장하지 않는다. Debug UI writer는 JSON을 쓰기 전에 이 값을 mask한다.
+Fixture에는 VWorld API key, Authorization header, access token, refresh token, tile path key를 저장하지 않는다. Debug UI writer는 `input`, `request`, `response`, `parsed`, `processed` 모든 필드의 민감값을 JSON을 쓰기 전에 mask한다. History store도 동일한 마스킹을 적용한다.
 
 ## 현재 live verification
 

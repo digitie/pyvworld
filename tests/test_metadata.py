@@ -71,3 +71,28 @@ def test_raw_to_json_safe_converts_dates_enums_and_tuples() -> None:
     payload = raw_to_json_safe({"today": date(2026, 5, 7), "coords": (127, 37)})
 
     assert payload == {"today": "2026-05-07", "coords": [127, 37]}
+
+
+def test_to_json_safe_raw_handles_time_enum_set_frozenset() -> None:
+    from datetime import time as time_type
+    from enum import Enum
+
+    from vworld import to_json_safe_raw
+
+    class Color(Enum):
+        RED = "red"
+        GREEN = "green"
+
+    t = time_type(14, 30, 0)
+    assert to_json_safe_raw(t) == "14:30:00"
+
+    assert to_json_safe_raw(Color.RED) == "red"
+    assert to_json_safe_raw(Color.GREEN) == "green"
+
+    result = to_json_safe_raw({1, 2, 3})
+    assert isinstance(result, list)
+    assert sorted(result) == [1, 2, 3]
+
+    result_fs = to_json_safe_raw(frozenset(["a", "b"]))
+    assert isinstance(result_fs, list)
+    assert sorted(result_fs) == ["a", "b"]
