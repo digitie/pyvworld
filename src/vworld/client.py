@@ -1106,9 +1106,9 @@ class VworldClient:
     ) -> str:
         """Build a TMS tile URL."""
 
-        layer_text = self._normalize_tile_layer(tile_map)
+        layer_text = _normalize_tile_layer(tile_map)
         ext = tile_type or _TILE_EXTENSIONS[layer_text]
-        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        _validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
         return self._tile_url(
             "tms",
             (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
@@ -1169,44 +1169,6 @@ class VworldClient:
         path = url.removeprefix(http.BASE_URL)
         text, content_type = http.get_text(path, params={}, include_key=False)
         return TextResponse(text=text, content_type=content_type)
-
-    def _normalize_tile_layer(self, layer: str | TileLayer) -> str:
-        text = layer.value if isinstance(layer, TileLayer) else str(layer)
-        for valid in _TILE_ZOOM_RANGES:
-            if text.lower() == valid.lower():
-                return valid
-        raise VworldInvalidParameterError(
-            "layer must be Base, white, midnight, Hybrid, or Satellite"
-        )
-
-    def _validate_tile(
-        self,
-        layer: str,
-        tile_matrix: int,
-        tile_row: int,
-        tile_col: int,
-        tile_type: str,
-    ) -> None:
-        min_zoom, max_zoom = _TILE_ZOOM_RANGES[layer]
-        validate_zoom(tile_matrix, min_zoom=min_zoom, max_zoom=max_zoom)
-        if tile_row < 0 or tile_col < 0:
-            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
-        allowed = _TILE_EXTENSIONS[layer]
-        if tile_type.lower() != allowed.lower():
-            raise VworldInvalidParameterError(f"{layer} tile_type must be {allowed}")
-
-    def _validate_theme_tile(
-        self,
-        tile_matrix: int,
-        tile_row: int,
-        tile_col: int,
-        tile_type: str,
-    ) -> None:
-        validate_zoom(tile_matrix, min_zoom=6, max_zoom=19)
-        if tile_row < 0 or tile_col < 0:
-            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
-        if tile_type.lower() not in {"png", "jpeg", "jpg"}:
-            raise VworldInvalidParameterError("theme tile_type must be png, jpeg, or jpg")
 
     # Debug/advanced escape hatch
     def build_rest_url(self, path: str, params: dict[str, Any] | None = None) -> str:
@@ -1304,7 +1266,10 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Call Search API 2.0 (``/req/search``) asynchronously."""
 
-        params = _make_search_params(query, type, category=category, size=size, page=page, bbox=bbox, crs=crs, callback=callback)
+        params = _make_search_params(
+            query, type, category=category, size=size, page=page,
+            bbox=bbox, crs=crs, callback=callback,
+        )
         return await self._require_http().get_json("/req/search", params)
 
     async def search_place(self, query: str, **kwargs: Any) -> JsonObject:
@@ -1351,7 +1316,9 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Convert an address to coordinates via Geocoder API 2.0 asynchronously."""
 
-        params = _make_get_coord_params(address, type, refine=refine, simple=simple, crs=crs, callback=callback)
+        params = _make_get_coord_params(
+            address, type, refine=refine, simple=simple, crs=crs, callback=callback,
+        )
         return await self._require_http().get_json("/req/address", params)
 
     async def geocode(
@@ -1376,7 +1343,10 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Convert coordinates to road and/or parcel addresses asynchronously."""
 
-        params = _make_get_address_params(point_value, type=type, zipcode=zipcode, simple=simple, crs=crs, callback=callback)
+        params = _make_get_address_params(
+            point_value, type=type, zipcode=zipcode, simple=simple,
+            crs=crs, callback=callback,
+        )
         return await self._require_http().get_json("/req/address", params)
 
     async def reverse_geocode(self, point_value: PointLike, **kwargs: Any) -> JsonObject:
@@ -1408,7 +1378,11 @@ class AsyncVworldClient:
         """Query 2D Data API 2.0 features asynchronously."""
 
         params = self._with_domain(
-            _make_data_feature_params(data, geom_filter=geom_filter, attr_filter=attr_filter, columns=columns, geometry=geometry, attribute=attribute, buffer=buffer, size=size, page=page, crs=crs, callback=callback),
+            _make_data_feature_params(
+                data, geom_filter=geom_filter, attr_filter=attr_filter,
+                columns=columns, geometry=geometry, attribute=attribute,
+                buffer=buffer, size=size, page=page, crs=crs, callback=callback,
+            ),
             domain,
         )
         return await self._require_http().get_json("/req/data", params)
@@ -1423,7 +1397,10 @@ class AsyncVworldClient:
     ) -> JsonObject:
         """Call the documented ``GetFeatureType`` operation asynchronously."""
 
-        params = self._with_domain(_make_data_feature_type_params(data, crs=crs, callback=callback), domain)
+        params = self._with_domain(
+            _make_data_feature_type_params(data, crs=crs, callback=callback),
+            domain,
+        )
         return await self._require_http().get_json("/req/data", params)
 
     async def wms_get_capabilities(
@@ -1757,9 +1734,9 @@ class AsyncVworldClient:
     ) -> str:
         """Build a TMS tile URL."""
 
-        layer_text = self._normalize_tile_layer(tile_map)
+        layer_text = _normalize_tile_layer(tile_map)
         ext = tile_type or _TILE_EXTENSIONS[layer_text]
-        self._validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
+        _validate_tile(layer_text, tile_matrix, tile_row, tile_col, ext)
         return self._tile_url(
             "tms",
             (layer_text, str(tile_matrix), str(tile_row), f"{tile_col}.{ext}"),
@@ -1820,44 +1797,6 @@ class AsyncVworldClient:
         path = url.removeprefix(http.BASE_URL)
         text, content_type = await http.get_text(path, params={}, include_key=False)
         return TextResponse(text=text, content_type=content_type)
-
-    def _normalize_tile_layer(self, layer: str | TileLayer) -> str:
-        text = layer.value if isinstance(layer, TileLayer) else str(layer)
-        for valid in _TILE_ZOOM_RANGES:
-            if text.lower() == valid.lower():
-                return valid
-        raise VworldInvalidParameterError(
-            "layer must be Base, white, midnight, Hybrid, or Satellite"
-        )
-
-    def _validate_tile(
-        self,
-        layer: str,
-        tile_matrix: int,
-        tile_row: int,
-        tile_col: int,
-        tile_type: str,
-    ) -> None:
-        min_zoom, max_zoom = _TILE_ZOOM_RANGES[layer]
-        validate_zoom(tile_matrix, min_zoom=min_zoom, max_zoom=max_zoom)
-        if tile_row < 0 or tile_col < 0:
-            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
-        allowed = _TILE_EXTENSIONS[layer]
-        if tile_type.lower() != allowed.lower():
-            raise VworldInvalidParameterError(f"{layer} tile_type must be {allowed}")
-
-    def _validate_theme_tile(
-        self,
-        tile_matrix: int,
-        tile_row: int,
-        tile_col: int,
-        tile_type: str,
-    ) -> None:
-        validate_zoom(tile_matrix, min_zoom=6, max_zoom=19)
-        if tile_row < 0 or tile_col < 0:
-            raise VworldInvalidParameterError("tile_row and tile_col must be non-negative")
-        if tile_type.lower() not in {"png", "jpeg", "jpg"}:
-            raise VworldInvalidParameterError("theme tile_type must be png, jpeg, or jpg")
 
     def build_rest_url(self, path: str, params: dict[str, Any] | None = None) -> str:
         """Build an authenticated URL for an advanced VWorld REST request."""
