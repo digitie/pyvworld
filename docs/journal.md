@@ -2,6 +2,12 @@
 
 역시간순으로 작업 내용을 기록한다.
 
+## 2026-05-28
+
+- `python-kraddr-base`를 런타임 의존성이나 소스 수준 DTO 계약으로 쓰지 않도록 `tests/test_dependency_boundaries.py`를 추가했다.
+- `reverse_geocode_latlon`, `static_map_latlon`, `static_map_latlon_url`의 동기/비동기 구현이 `LatLon` 값 객체를 중간에 만들지 않고 `(lon, lat)` 기본 튜플로 요청 파라미터를 조립하게 정리했다.
+- README, `docs/api-coverage.md`, `docs/repeated-mistakes.md`에 `PlaceCoordinate`/`Address` 같은 외부 DTO를 공개 입력으로 받지 않는 경계를 명시했다.
+
 ## 2025-05-23
 
 - 코드 리뷰 보고서 작성 (Critical 2, Major 10, Minor 27, Suggestion 17)

@@ -22,7 +22,9 @@
 
 ## Public type
 
-Public wrapper는 원래 문자열 값과 typed helper를 모두 받는다. Enum은 search/address category, CRS, legend type, image format, StaticMap basemap, tile layer 같은 문서화된 parameter set을 다룬다. `LatLon`, `LonLat`, `BBox`, `BinaryResponse`, `TextResponse`는 frozen Pydantic v2 model이므로 외부 program은 기존 tuple input을 바꾸지 않고 `model_validate()`, `model_dump()`, JSON schema generation을 사용할 수 있다.
+Public wrapper는 원래 문자열 값과 이 패키지가 제공하는 typed helper를 모두 받는다. Enum은 search/address category, CRS, legend type, image format, StaticMap basemap, tile layer 같은 문서화된 parameter set을 다룬다. `LatLon`, `LonLat`, `BBox`, `BinaryResponse`, `TextResponse`는 frozen Pydantic v2 model이므로 외부 program은 기존 tuple input을 바꾸지 않고 `model_validate()`, `model_dump()`, JSON schema generation을 사용할 수 있다.
+
+외부 장소/주소 DTO는 공개 입력 계약에 포함하지 않는다. 특히 `python-kraddr-base`의 `PlaceCoordinate`, `Address`는 import하지 않고, 함수 내부에서도 중간 값 객체로 만들지 않는다. 외부 앱은 필요한 값을 문자열 주소, VWorld `x,y` 문자열, `(lon, lat)` 튜플, 또는 `LatLon`/`LonLat`로 변환한 뒤 호출한다.
 
 ## HTTP runtime
 

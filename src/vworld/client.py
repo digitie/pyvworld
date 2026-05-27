@@ -32,7 +32,6 @@ from .models import (
     Crs,
     DistrictCategory,
     ImageFormat,
-    LatLon,
     LegendType,
     PointLike,
     ReverseGeocodeType,
@@ -655,9 +654,9 @@ class VworldClient:
         return self.get_address(point_value, **kwargs)
 
     def reverse_geocode_latlon(self, lat: float, lon: float, **kwargs: Any) -> JsonObject:
-        """Reverse geocode a WGS84 latitude/longitude point."""
+        """WGS84 위도/경도 값을 좌표 주소 변환 API에 전달한다."""
 
-        return self.get_address(LatLon(lat=lat, lon=lon), **kwargs)
+        return self.get_address((lon, lat), **kwargs)
 
     # 2D Data API 2.0
     def get_data_feature(
@@ -1008,14 +1007,14 @@ class VworldClient:
         return BinaryResponse(content=content, content_type=content_type)
 
     def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
-        """Call StaticMap with a WGS84 latitude/longitude center."""
+        """WGS84 위도/경도 중심점으로 StaticMap을 호출한다."""
 
-        return self.static_map(center=LatLon(lat=lat, lon=lon), **kwargs)
+        return self.static_map(center=(lon, lat), **kwargs)
 
     def static_map_latlon_url(self, lat: float, lon: float, **kwargs: Any) -> str:
-        """Build a StaticMap URL with a WGS84 latitude/longitude center."""
+        """WGS84 위도/경도 중심점으로 StaticMap URL을 만든다."""
 
-        return self.static_map_url(center=LatLon(lat=lat, lon=lon), **kwargs)
+        return self.static_map_url(center=(lon, lat), **kwargs)
 
     # WMTS/TMS tile endpoints
     def wmts_tile_url(
@@ -1355,9 +1354,9 @@ class AsyncVworldClient:
         return await self.get_address(point_value, **kwargs)
 
     async def reverse_geocode_latlon(self, lat: float, lon: float, **kwargs: Any) -> JsonObject:
-        """Reverse geocode a WGS84 latitude/longitude point asynchronously."""
+        """WGS84 위도/경도 값을 비동기 좌표 주소 변환 API에 전달한다."""
 
-        return await self.get_address(LatLon(lat=lat, lon=lon), **kwargs)
+        return await self.get_address((lon, lat), **kwargs)
 
     async def get_data_feature(
         self,
@@ -1637,14 +1636,14 @@ class AsyncVworldClient:
         return BinaryResponse(content=content, content_type=content_type)
 
     async def static_map_latlon(self, lat: float, lon: float, **kwargs: Any) -> BinaryResponse:
-        """Call StaticMap with a WGS84 latitude/longitude center asynchronously."""
+        """WGS84 위도/경도 중심점으로 StaticMap을 비동기 호출한다."""
 
-        return await self.static_map(center=LatLon(lat=lat, lon=lon), **kwargs)
+        return await self.static_map(center=(lon, lat), **kwargs)
 
     def static_map_latlon_url(self, lat: float, lon: float, **kwargs: Any) -> str:
-        """Build a StaticMap URL with a WGS84 latitude/longitude center."""
+        """WGS84 위도/경도 중심점으로 StaticMap URL을 만든다."""
 
-        return self.static_map_url(center=LatLon(lat=lat, lon=lon), **kwargs)
+        return self.static_map_url(center=(lon, lat), **kwargs)
 
     def wmts_tile_url(
         self,

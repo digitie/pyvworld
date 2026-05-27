@@ -133,6 +133,8 @@ payload = latlon(37.402352535, 127.101313354).model_dump()
 
 VWorld의 `point` 파라미터는 `x,y` 순서입니다. `EPSG:4326`에서는 `x=lon`, `y=lat`이므로 일반적인 “위경도” 입력은 `latlon(lat, lon)` 또는 `LatLon(lat=..., lon=...)`을 쓰는 것을 권장합니다. 기존 `(lon, lat)` 튜플도 계속 지원합니다.
 
+`python-kraddr-base`의 `PlaceCoordinate`, `Address` 같은 외부 DTO는 런타임 의존성이나 입력 계약에 포함하지 않습니다. 외부 앱 경계에서 받은 장소/주소 객체는 이 패키지로 넘기기 전에 문자열 주소, VWorld `x,y` 문자열, `(lon, lat)` 튜플, 또는 이 패키지의 `LatLon`/`LonLat` 값 객체로 변환하세요.
+
 `StaticMapBase`와 `ImageFormat`은 공식 문서의 값(`NONE`, `GRAPHIC_WHITE`, `GRAPHIC_NIGHT`, `PHOTO_HYBRID`, `bmp` 등)을 포함합니다. 기존에 쓰기 쉬운 이름으로 넣었던 `StaticMapBase.HYBRID`는 `PHOTO_HYBRID` 별칭으로 유지합니다.
 
 2D 데이터 API:

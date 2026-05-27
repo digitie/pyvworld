@@ -4,7 +4,7 @@
 
 ## 마지막 갱신
 
-2025-05-23
+2026-05-28
 
 ## 완료된 항목
 
@@ -21,6 +21,7 @@
 - [x] Sync/Async validation·param 로직 공유 함수 추출 (DRY)
 - [x] fixture/history 민감정보 마스킹 전면 적용
 - [x] HttpxMock 미소비 라우트 검증 추가
+- [x] `python-kraddr-base` 비의존 경계 테스트와 외부 DTO 배제 문서화
 
 ## 진행 중
 
