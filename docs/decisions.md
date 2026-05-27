@@ -15,3 +15,11 @@
 - **맥락**: fixture_writer가 `input`, `request`, `response` 필드만 `redact_sensitive()`를 적용하고 `parsed`, `processed` 필드는 누락하고 있었다.
 - **결정**: 모든 필드(`input`, `request`, `response`, `parsed`, `processed`)에 `redact_sensitive()`를 적용한다. history_store도 동일하게 적용한다.
 - **근거**: 파서가 원본 응답 URL을 보존할 수 있으므로 모든 출력에서 마스킹해야 한다.
+
+## ADR-003: 외부 주소 DTO 비의존
+
+- **상태**: 채택
+- **일자**: 2026-05-28
+- **맥락**: `python-kraddr-base`의 `PlaceCoordinate`, `Address` 같은 외부 DTO를 공개 입력으로 받으면 이 패키지가 VWorld HTTP client를 넘어 앱 공통 주소 모델의 호환성까지 떠안게 된다.
+- **결정**: `python-kraddr-base`를 런타임 의존성으로 두지 않고, 소스 코드에서도 해당 DTO를 참조하지 않는다. 공개 함수는 문자열 주소, VWorld `x,y` 문자열, `(lon, lat)` 튜플, 또는 이 패키지의 값 객체만 다룬다.
+- **근거**: VWorld 공식 API는 문자열 주소와 `x,y` point만 요구한다. 외부 DTO 변환은 호출자 경계에서 끝내는 편이 요청 조립 책임을 단순하게 유지한다.
